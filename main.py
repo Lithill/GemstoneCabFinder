@@ -366,9 +366,8 @@ try:
 
             print("  New shops discovered in batch:", new_shops)
             print("  Total shops discovered so far:", len(seen_search_shop_ids))
-            
             print("  Total unique listings:", len(all_listings))
-
+            
             if len(batch_listings) < batch_size:
                 break
 
