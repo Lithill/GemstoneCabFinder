@@ -13,3 +13,4 @@ output/
 data/etsy_favourite_shops.csv
 data/etsy_favourites_complete.csv
 data/*_backup.db
+.vscode/
