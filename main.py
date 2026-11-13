@@ -22,8 +22,6 @@ from config import (
     TARGET_SHIPPING_COUNTRIES,
 )
 
-load_dotenv()
-
 # Load shops that should be excluded from search results
 def load_excluded_shops(filename="data/excluded_shops.txt"):
     try:
@@ -36,18 +34,6 @@ def load_excluded_shops(filename="data/excluded_shops.txt"):
     except FileNotFoundError:
         print("Exclusion file not found. Continuing without exclusions.")
         return set()
-
-
-excluded_shops = load_excluded_shops()
-
-print("Excluded shops loaded:", len(excluded_shops))
-
-api_key = os.getenv("ETSY_API_KEY")
-shared_secret = os.getenv("ETSY_SHARED_SECRET")
-
-headers = {
-    "x-api-key": f"{api_key}:{shared_secret}"
-}
 
 def classify_wysiwyg(title, description=""):
     text = (title + " " + description).casefold()
@@ -194,6 +180,18 @@ print("Minimum reviews:", MIN_SHOP_REVIEWS)
 
 def main():
     """Run the Etsy gemstone cabochon seller search."""
+
+    load_dotenv()
+
+    api_key = os.getenv("ETSY_API_KEY")
+    shared_secret = os.getenv("ETSY_SHARED_SECRET")
+
+    headers = {
+        "x-api-key": f"{api_key}:{shared_secret}"
+    }
+
+    excluded_shops = load_excluded_shops()
+    print("Excluded shops loaded:", len(excluded_shops))
 
     saved_shops = load_saved_shops()
 
