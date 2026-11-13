@@ -564,24 +564,6 @@ def main():
                 print(f"  {status}: {count}")
 
             print("\n" + "=" * 40)
-
-            current_shop_ids = {shop["shop_id"] for shop in final_shops}
-
-            missing_saved_shops = [
-                shop for shop in saved_shops
-                if shop["shop_id"] not in current_shop_ids
-            ]
-
-            missing_shop_ids = [
-                shop["shop_id"] for shop in missing_saved_shops
-            ]
-
-            print("Saved shop IDs needing refresh:", missing_shop_ids)
-
-            print("Previously saved shops not found this run:")
-            for shop in missing_saved_shops:
-                print(" ", shop["shop_name"])
-
             print("FINAL QUALIFYING SHOPS:", len(final_shops))
             print("Shops with unknown shipping country:",
                 len(unknown_shipping_shops))
