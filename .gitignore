@@ -7,3 +7,6 @@ etsy_oauth_state.json
 etsy_oauth_code.json
 etsy_tokens.json
 gemstone_sellers.db
+gemstone_sellers_test.xlsx
+gemstone_sellers.xlsx
+output/

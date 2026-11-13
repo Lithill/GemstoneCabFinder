@@ -1,6 +1,6 @@
 import sqlite3
 
-connection = sqlite3.connect("gemstone_sellers.db")
+connection = sqlite3.connect("data/gemstone_sellers.db")
 
 cursor = connection.cursor()
 

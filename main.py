@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Load shops that should be excluded from search results
-def load_excluded_shops(filename="excluded_shops.txt"):
+def load_excluded_shops(filename="data/excluded_shops.txt"):
     try:
         with open(filename, "r", encoding="utf-8") as file:
             return {
@@ -216,7 +216,7 @@ def is_loose_cabochon(title):
     return True
 
 def load_saved_shops():
-    connection = sqlite3.connect("gemstone_sellers.db")
+    connection = sqlite3.connect("data/gemstone_sellers.db")
 
     rows = connection.execute("""
         SELECT shop_id, shop_name, last_checked, rating, review_count, shop_age_days, shipping_country
@@ -252,7 +252,7 @@ def save_shop_to_database(shop):
             datetime.now(timezone.utc) - created_date
         ).days
 
-    connection = sqlite3.connect("gemstone_sellers.db")
+    connection = sqlite3.connect("data/gemstone_sellers.db")
 
     connection.execute("""
         INSERT INTO shops (
@@ -367,7 +367,7 @@ try:
             print("  New shops discovered in batch:", new_shops)
             print("  Total shops discovered so far:", len(seen_search_shop_ids))
             print("  Total unique listings:", len(all_listings))
-            
+
             if len(batch_listings) < batch_size:
                 break
 
@@ -694,7 +694,7 @@ try:
 
         df = pd.DataFrame(excel_rows)
 
-        output_file = "gemstone_sellers_test.xlsx"
+        output_file = os.path.join("output", "gemstone_sellers_test.xlsx")
 
         # Prepare individual cabochon listings for Excel
         shop_names = {
