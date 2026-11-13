@@ -1,6 +1,6 @@
 # Gemstone cabochon seller search settings
 import sqlite3
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import os
 import re
 import requests
@@ -13,7 +13,6 @@ from config import (
     FINISHED_JEWELLERY_TERMS,
     WYSIWYG_POSITIVE_PHRASES,
     WYSIWYG_NEGATIVE_PHRASES,
-    SHOP_CACHE_DAYS,
     MIN_SHOP_AGE_DAYS,
     MIN_SHOP_RATING,
     MIN_SHOP_REVIEWS,
@@ -181,6 +180,168 @@ def save_shop_to_database(shop):
     connection.commit()
     connection.close()
 
+def update_review_list(new_shops, unknown_shipping_shops, output_file):
+    """Add newly qualified shops without restoring manually deleted shops."""
+
+    history_file = "data/reviewed_shop_ids.txt"
+
+    columns = [
+        "Shop Name",
+        "Shop ID",
+        "Ships From",
+        "Rating",
+        "Reviews",
+        "Shop URL",
+    ]
+
+    # Load IDs of shops previously placed on the review list
+    if os.path.exists(history_file):
+        with open(history_file, "r", encoding="utf-8") as file:
+            reviewed_ids = {
+                line.strip()
+                for line in file
+                if line.strip()
+            }
+    else:
+        reviewed_ids = set()
+
+    # Load the existing Excel review list
+    if os.path.exists(output_file):
+        existing_df = pd.read_excel(
+            output_file,
+            sheet_name="Shops",
+            dtype={"Shop ID": str}
+        )
+    else:
+        existing_df = pd.DataFrame(columns=columns)
+
+    existing_df = existing_df.reindex(columns=columns)
+
+    existing_ids = {
+        str(shop_id).strip()
+        for shop_id in existing_df["Shop ID"].dropna()
+    }
+
+    # Record all shops already present, including older entries
+    reviewed_ids.update(existing_ids)
+
+    new_rows = []
+
+    for shop in new_shops:
+        shop_id = shop.get("shop_id")
+
+        if shop_id is None:
+            continue
+
+        shop_id_text = str(shop_id)
+
+        if shop_id_text in reviewed_ids:
+            continue
+
+        shop_name = shop.get("shop_name")
+
+        new_rows.append({
+            "Shop Name": shop_name,
+            "Shop ID": shop_id,
+            "Ships From": shop.get("shipping_from_country_iso"),
+            "Rating": shop.get("review_average"),
+            "Reviews": shop.get("review_count"),
+            "Shop URL": f"https://www.etsy.com/shop/{shop_name}",
+        })
+
+        reviewed_ids.add(shop_id_text)
+
+    # Append only genuinely new shops
+    new_df = pd.DataFrame(new_rows, columns=columns)
+
+    updated_df = pd.concat(
+        [existing_df, new_df],
+        ignore_index=True
+    )
+
+    # Preserve the separate shipping-check worksheet
+    if os.path.exists(output_file):
+        try:
+            unknown_df = pd.read_excel(
+                output_file,
+                sheet_name="Needs Shipping Check",
+                dtype={"Shop ID": str}
+            )
+        except ValueError:
+            unknown_df = pd.DataFrame()
+    else:
+        unknown_df = pd.DataFrame()
+
+    unknown_columns = [
+        "Shop Name",
+        "Shop ID",
+        "Rating",
+        "Reviews",
+        "Shipping Country",
+        "Shop URL",
+    ]
+
+    unknown_df = unknown_df.reindex(columns=unknown_columns)
+
+    known_unknown_ids = {
+        str(shop_id).strip()
+        for shop_id in unknown_df["Shop ID"].dropna()
+    }
+
+    unknown_rows = []
+
+    for shop in unknown_shipping_shops:
+        shop_id = shop.get("shop_id")
+
+        if shop_id is None:
+            continue
+
+        if str(shop_id) in known_unknown_ids:
+            continue
+
+        shop_name = shop.get("shop_name")
+
+        unknown_rows.append({
+            "Shop Name": shop_name,
+            "Shop ID": shop_id,
+            "Rating": shop.get("review_average"),
+            "Reviews": shop.get("review_count"),
+            "Shipping Country": "Unknown",
+            "Shop URL": f"https://www.etsy.com/shop/{shop_name}",
+        })
+
+        known_unknown_ids.add(str(shop_id))
+
+    unknown_df = pd.concat(
+        [
+            unknown_df,
+            pd.DataFrame(unknown_rows, columns=unknown_columns)
+        ],
+        ignore_index=True
+    )
+
+    # Save the updated review list
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        updated_df.to_excel(
+            writer,
+            sheet_name="Shops",
+            index=False
+        )
+
+        unknown_df.to_excel(
+            writer,
+            sheet_name="Needs Shipping Check",
+            index=False
+        )
+
+    # Save the history of shops already offered for review
+    with open(history_file, "w", encoding="utf-8") as file:
+        for shop_id in sorted(reviewed_ids):
+            file.write(shop_id + "\n")
+
+    print("New shops added to review list:", len(new_rows))
+    print("Total shops remaining in review list:", len(updated_df))
+
 def main():
     """Run the Etsy gemstone cabochon seller search."""
 
@@ -303,27 +464,24 @@ def main():
             print("Total matching listings:", len(all_listings))
             print("Listings returned:", len(listings))
 
+            # Classify listings without printing every listing
+            wysiwyg_counts = {
+                "Likely WYSIWYG": 0,
+                "Needs checking": 0,
+                "Likely random selection": 0,
+            }
+
             for listing in listings:
                 title = listing.get("title") or ""
                 description = listing.get("description") or ""
 
-                print("Description available:", bool(description))
-
                 wysiwyg_status = classify_wysiwyg(title, description)
-
                 listing["wysiwyg_status"] = wysiwyg_status
+                wysiwyg_counts[wysiwyg_status] += 1
 
-                print("\nTitle:", title)
-                print("WYSIWYG:", wysiwyg_status)
-                matched_phrases = [
-                    phrase
-                    for phrase in WYSIWYG_POSITIVE_PHRASES + WYSIWYG_NEGATIVE_PHRASES
-                    if phrase in (title + " " + description).casefold()
-                ]
-
-                print("Matched WYSIWYG phrases:", matched_phrases)
-                print("Shop ID:", listing.get("shop_id"))
-                print("URL:", listing.get("url"))
+            print("\nMarketplace listing classifications:")
+            for status, count in wysiwyg_counts.items():
+                print(f"  {status}: {count}")
 
             # Collect unique shops from the search results
             unique_shop_ids = set()
@@ -335,9 +493,6 @@ def main():
                     unique_shop_ids.add(shop_id)
 
             print("\nUnique shops found:", len(unique_shop_ids))
-
-            for shop_id in sorted(unique_shop_ids):
-                print("Shop ID:", shop_id)
 
             # Check every unique shop
             qualifying_shops = []
@@ -352,48 +507,6 @@ def main():
             )
 
             for shop_id in sorted(shops_to_check):
-                cached_shop = saved_shops_by_id.get(shop_id)
-                last_checked = (
-                    cached_shop.get("last_checked")
-                    if cached_shop
-                    else None
-                )
-                cache_is_fresh = False
-
-                if last_checked:
-                    checked_date = datetime.fromisoformat(last_checked)
-                    cache_is_fresh = (
-                        datetime.now(timezone.utc) - checked_date
-                        < timedelta(days=SHOP_CACHE_DAYS)
-                    )
-                cache_has_required_data = (
-                    cached_shop is not None
-                    and all(
-                        cached_shop.get(field) is not None
-                        for field in (
-                            "shop_name",
-                            "rating",
-                            "review_count",
-                            "shop_age_days",
-                            "shipping_country",
-                        )
-                    )
-                )
-                use_cached_shop = cache_is_fresh and cache_has_required_data
-                if use_cached_shop:
-                    print(f"Cache available for shop ID: {shop_id}")
-                    cached_shop_data = {
-                        "shop_id": cached_shop["shop_id"],
-                        "shop_name": cached_shop["shop_name"],
-                        "review_average": cached_shop["rating"],
-                        "review_count": cached_shop["review_count"],
-                        "shipping_from_country_iso": cached_shop["shipping_country"],
-                        "url": f"https://www.etsy.com/shop/{cached_shop['shop_name']}",
-                        "_from_cache": True,
-                    }
-                    if cached_shop["shop_name"].casefold() not in excluded_shops:
-                        qualifying_shops.append(cached_shop_data)
-                    continue
 
                 shop_url = f"https://openapi.etsy.com/v3/application/shops/{shop_id}"
 
@@ -418,10 +531,6 @@ def main():
                     print(f"\nSkipping excluded shop: {shop_name}")
                     continue
 
-                print(f"\nChecking: {shop_name}")
-                print("Rating:", rating)
-                print("Reviews:", reviews)
-
                 if rating is None or reviews is None:
                     print("Result: EXCLUDED - missing review information")
                     continue
@@ -443,17 +552,12 @@ def main():
                     datetime.now(timezone.utc) - created_date
                 ).days
 
-                print("Shop age:", shop_age_days, "days")
-
                 if (
                     rating >= MIN_SHOP_RATING
                     and reviews >= MIN_SHOP_REVIEWS
                     and shop_age_days >= MIN_SHOP_AGE_DAYS
                 ):
-                    print("Result: PASSED all three checks")
                     qualifying_shops.append(shop)
-                else:
-                    print("Result: EXCLUDED")
 
             print("\n" + "=" * 40)
             print("Shops passing rating, reviews and age checks:", len(qualifying_shops))
@@ -462,29 +566,14 @@ def main():
             final_shops = []
             unknown_shipping_shops = []
 
-            print("\nChecking shipping countries:")
-
             for shop in qualifying_shops:
-                shop_name = shop.get("shop_name")
                 shipping_country = shop.get("shipping_from_country_iso")
-
-                print(f"\nShop: {shop_name}")
-                print("Ships from:", shipping_country)
 
                 if shipping_country in TARGET_SHIPPING_COUNTRIES:
                     final_shops.append(shop)
 
-                    if not shop.get("_from_cache"):
-                        save_shop_to_database(shop)
-
-                    print("Result: PASSED shipping country check")
-
                 elif not shipping_country:
                     unknown_shipping_shops.append(shop)
-                    print("Result: UNKNOWN shipping country")
-
-                else:
-                    print("Result: EXCLUDED - ships from another country")
 
             # Store listings retrieved directly from qualifying shops
             all_shop_listings = []
@@ -570,53 +659,28 @@ def main():
 
             for shop in final_shops:
                 print("Qualified:", shop.get("shop_name"))
-            # Export qualifying shops to Excel
-            excel_rows = []
 
+            # Update the permanent Excel shop review list
+            output_file = os.path.join(
+                "output",
+                "gemstone_sellers_test.xlsx"
+            )
+
+            update_review_list(
+                final_shops,
+                unknown_shipping_shops,
+                output_file
+            )
+
+            # Save newly qualified shops only after updating Excel
             for shop in final_shops:
-                excel_rows.append({
-                    "Shop Name": shop.get("shop_name"),
-                    "Shop ID": shop.get("shop_id"),
-                    "Ships From": shop.get("shipping_from_country_iso"),
-                    "Rating": shop.get("review_average"),
-                    "Reviews": shop.get("review_count"),
-                    "Shop URL": shop.get("url"),
-                })
+                save_shop_to_database(shop)
 
-            df = pd.DataFrame(excel_rows)
-
-            output_file = os.path.join("output", "gemstone_sellers_test.xlsx")
-
-            # Prepare individual cabochon listings for Excel
-            shop_names = {
-                shop.get("shop_id"): shop.get("shop_name")
-                for shop in final_shops
-            }
-
-            listing_rows = []
-
-            for listing in cabochon_shop_listings:
-                listing_rows.append({
-                    "Shop Name": shop_names.get(listing.get("shop_id")),
-                    "Listing Title": listing.get("title"),
-                    "Listing ID": listing.get("listing_id"),
-                    "WYSIWYG Status": listing.get("wysiwyg_status"),
-                    "Listing URL": listing.get("url"),
-                })
-
-            listings_df = pd.DataFrame(listing_rows)
-
-            # Save both worksheets in one Excel file
-            with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-                df.to_excel(writer, sheet_name="Shops", index=False)
-                listings_df.to_excel(
-                    writer,
-                    sheet_name="Cabochon Listings",
-                    index=False
-                )
-
-            print("\nExcel file created:", output_file)
-            print("Shops exported:", len(df))
+            print("\nExcel review list updated:", output_file)
+            print(
+                "Shops needing shipping verification:",
+                len(unknown_shipping_shops)
+            )
 
         else:
             print("Search unsuccessful.")
