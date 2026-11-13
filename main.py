@@ -172,14 +172,14 @@ def save_shop_to_database(shop):
     connection.commit()
     connection.close()
 
-print("\nGemstone seller search settings loaded.")
-print("Target countries:", ", ".join(TARGET_COUNTRIES))
-print("Minimum shop age:", MIN_SHOP_AGE_DAYS, "days")
-print("Minimum rating:", MIN_SHOP_RATING)
-print("Minimum reviews:", MIN_SHOP_REVIEWS)
-
 def main():
     """Run the Etsy gemstone cabochon seller search."""
+
+    print("\nGemstone seller search settings loaded.")
+    print("Target countries:", ", ".join(TARGET_COUNTRIES))
+    print("Minimum shop age:", MIN_SHOP_AGE_DAYS, "days")
+    print("Minimum rating:", MIN_SHOP_RATING)
+    print("Minimum reviews:", MIN_SHOP_REVIEWS)
 
     load_dotenv()
 
