@@ -10,3 +10,6 @@ gemstone_sellers.db
 gemstone_sellers_test.xlsx
 gemstone_sellers.xlsx
 output/
+data/etsy_favourite_shops.csv
+data/etsy_favourites_complete.csv
+data/*_backup.db
