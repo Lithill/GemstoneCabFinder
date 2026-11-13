@@ -1,3 +1,6 @@
 # Add Etsy shop names here, one per line
 ClassicCircle
 jaipzu
+MINERALWORLDWIDE
+rarestonecab
+InfinityGemsUs

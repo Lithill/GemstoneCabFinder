@@ -6,6 +6,7 @@ import re
 import requests
 import time
 import pandas as pd
+from openpyxl.styles import Font
 from dotenv import load_dotenv
 from config import (
     GEMSTONES,
@@ -181,6 +182,27 @@ def save_shop_to_database(shop):
 
     connection.commit()
     connection.close()
+
+def make_urls_clickable(worksheet):
+    """Make Etsy URLs clickable in an Excel worksheet."""
+
+    url_columns = ["Shop URL", "Evidence Listing URL"]
+
+    for column in worksheet.iter_cols():
+        header = column[0].value
+
+        if header not in url_columns:
+            continue
+
+        for cell in column[1:]:
+            url = cell.value
+
+            if isinstance(url, str) and url.startswith("https://"):
+                cell.hyperlink = url
+                cell.font = Font(
+                    color="0563C1",
+                    underline="single",
+                )
 
 def update_review_list(new_shops, unknown_shipping_shops, output_file):
     """Add newly qualified shops without restoring manually deleted shops."""
@@ -373,6 +395,9 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
             sheet_name="Needs Shipping Check",
             index=False
         )
+
+        make_urls_clickable(writer.sheets["Shops"])
+        make_urls_clickable(writer.sheets["Needs Shipping Check"])
 
     # Save the history of shops already offered for review
     with open(history_file, "w", encoding="utf-8") as file:
