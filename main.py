@@ -35,6 +35,15 @@ def load_excluded_shops(filename="data/excluded_shops.txt"):
         print("Exclusion file not found. Continuing without exclusions.")
         return set()
 
+def load_favourite_shops():
+    """Load favourite Etsy shop names from the database."""
+    with sqlite3.connect("data/gemstone_sellers.db") as connection:
+        rows = connection.execute(
+            "SELECT shop_name FROM favourite_shops"
+        ).fetchall()
+
+    return {row[0].casefold() for row in rows}
+
 def classify_wysiwyg(title, description=""):
     text = (title + " " + description).casefold()
 
@@ -191,7 +200,12 @@ def main():
     }
 
     excluded_shops = load_excluded_shops()
-    print("Excluded shops loaded:", len(excluded_shops))
+    favourite_shops = load_favourite_shops()
+
+    excluded_shops.update(favourite_shops)
+
+    print("Favourite shops loaded:", len(favourite_shops))
+    print("Total excluded shops:", len(excluded_shops))
 
     saved_shops = load_saved_shops()
 
@@ -328,9 +342,14 @@ def main():
             # Check every unique shop
             qualifying_shops = []
 
-            shops_to_check = unique_shop_ids | {
-                shop["shop_id"] for shop in saved_shops
-            }
+            # Check only newly discovered shops not already saved
+            shops_to_check = unique_shop_ids - set(saved_shops_by_id)
+
+            print("New shops to check:", len(shops_to_check))
+            print(
+                "Previously saved shops skipped:",
+                len(unique_shop_ids & set(saved_shops_by_id))
+            )
 
             for shop_id in sorted(shops_to_check):
                 cached_shop = saved_shops_by_id.get(shop_id)
