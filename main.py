@@ -186,14 +186,6 @@ def save_shop_to_database(shop):
     connection.commit()
     connection.close()
 
-saved_shops = load_saved_shops()
-
-saved_shops_by_id = {
-    shop["shop_id"]: shop
-    for shop in saved_shops
-}
-
-print(f"Shops loaded from database: {len(saved_shops)}")
 print("\nGemstone seller search settings loaded.")
 print("Target countries:", ", ".join(TARGET_COUNTRIES))
 print("Minimum shop age:", MIN_SHOP_AGE_DAYS, "days")
@@ -202,6 +194,15 @@ print("Minimum reviews:", MIN_SHOP_REVIEWS)
 
 def main():
     """Run the Etsy gemstone cabochon seller search."""
+
+    saved_shops = load_saved_shops()
+
+    saved_shops_by_id = {
+        shop["shop_id"]: shop
+        for shop in saved_shops
+    }
+
+    print(f"Shops loaded from database: {len(saved_shops)}")
 
     # First gemstone cabochon search
 
