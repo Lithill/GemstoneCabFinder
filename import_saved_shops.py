@@ -64,7 +64,7 @@ with sqlite3.connect(database_file) as connection:
 # Also honour the manual exclusion file
 excluded_names = set()
 
-exclusion_file = Path("data/excluded_shops.txt")
+exclusion_file = Path("data/favourited_shops.txt")
 
 if exclusion_file.exists():
     excluded_names = {

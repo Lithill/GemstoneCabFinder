@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import os
 import re
 import requests
+import time
 import pandas as pd
 from dotenv import load_dotenv
 from config import (
@@ -22,7 +23,7 @@ from config import (
 )
 
 # Load shops that should be excluded from search results
-def load_excluded_shops(filename="data/excluded_shops.txt"):
+def load_favourited_shops(filename="data/favourited_shops.txt"):
     try:
         with open(filename, "r", encoding="utf-8") as file:
             return {
@@ -43,20 +44,21 @@ def load_favourite_shops():
 
     return {row[0].casefold() for row in rows}
 
-def classify_wysiwyg(title, description=""):
-    text = (title + " " + description).casefold()
+def classify_wysiwyg(title, description="", rare_find=False):
+    """Classify evidence that the buyer receives the pictured stone."""
+    text = (str(title) + " " + str(description)).casefold()
 
-    # Check for wording suggesting random stones
     for phrase in WYSIWYG_NEGATIVE_PHRASES:
         if phrase in text:
             return "Likely random selection"
 
-    # Check for wording confirming the photographed stone
     for phrase in WYSIWYG_POSITIVE_PHRASES:
         if phrase in text:
             return "Likely WYSIWYG"
 
-    # Not enough information to decide
+    if rare_find:
+        return "Possible WYSIWYG - Rare find"
+
     return "Needs checking"
 
 def contains_listed_gemstone(title):
@@ -191,6 +193,11 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
         "Ships From",
         "Rating",
         "Reviews",
+        "Review Priority",
+        "WYSIWYG Evidence",
+        "Evidence Listing URL",
+        "UK Delivery",
+        "UK Postage GBP",
         "Shop URL",
     ]
 
@@ -217,6 +224,19 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
 
     existing_df = existing_df.reindex(columns=columns)
 
+    # Remove favourite and manually excluded shops already in Excel
+    excluded_names = load_favourited_shops()
+    excluded_names.update(load_favourite_shops())
+
+    existing_df = existing_df[
+        ~existing_df["Shop Name"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+        .isin(excluded_names)
+    ].copy()
+
     existing_ids = {
         str(shop_id).strip()
         for shop_id in existing_df["Shop ID"].dropna()
@@ -240,6 +260,9 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
 
         shop_name = shop.get("shop_name")
 
+        if str(shop_name or "").strip().casefold() in excluded_names:
+            continue
+
         new_rows.append({
             "Shop Name": shop_name,
             "Shop ID": shop_id,
@@ -247,6 +270,23 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
             "Rating": shop.get("review_average"),
             "Reviews": shop.get("review_count"),
             "Shop URL": f"https://www.etsy.com/shop/{shop_name}",
+            "Review Priority": (
+                "High"
+                if shop.get("wysiwyg_status") == "Likely WYSIWYG"
+                else "Medium"
+                if shop.get("wysiwyg_status") == "Possible WYSIWYG - Rare find"
+                else "Low"
+                if shop.get("wysiwyg_status") == "Likely random selection"
+                else "Normal"
+            ),
+            "WYSIWYG Evidence": shop.get(
+                "wysiwyg_status", "Needs checking"
+            ),
+            "Evidence Listing URL": shop.get(
+                "evidence_listing_url", ""
+            ),
+            "UK Delivery": "Needs checking",
+            "UK Postage GBP": None,
         })
 
         reviewed_ids.add(shop_id_text)
@@ -342,6 +382,33 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
     print("New shops added to review list:", len(new_rows))
     print("Total shops remaining in review list:", len(updated_df))
 
+def get_etsy_with_retries(url, headers, params=None):
+    """Retry temporary Etsy timeouts and stop on rate limits."""
+
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                url,
+                headers=headers,
+                params=params,
+                timeout=30,
+            )
+
+            if response.status_code == 429:
+                print("Etsy API rate limit reached (HTTP 429).")
+                raise RuntimeError("Etsy API rate limit reached")
+
+            return response
+
+        except (requests.Timeout, requests.ConnectionError) as error:
+            print(f"  Request failed (attempt {attempt + 1}/3): {error}")
+
+            if attempt < 2:
+                time.sleep(5)
+
+    print("  Etsy did not respond after 3 attempts.")
+    return None
+
 def main():
     """Run the Etsy gemstone cabochon seller search."""
 
@@ -360,13 +427,13 @@ def main():
         "x-api-key": f"{api_key}:{shared_secret}"
     }
 
-    excluded_shops = load_excluded_shops()
+    favourited_shops = load_favourited_shops()
     favourite_shops = load_favourite_shops()
 
-    excluded_shops.update(favourite_shops)
+    favourited_shops.update(favourite_shops)
 
     print("Favourite shops loaded:", len(favourite_shops))
-    print("Total excluded shops:", len(excluded_shops))
+    print("Total excluded shops:", len(favourited_shops))
 
     saved_shops = load_saved_shops()
 
@@ -395,6 +462,7 @@ def main():
                 "limit": batch_size,
                 "offset": 0,
                 "sort_on": "score",
+                "buyer_country": "GB",
             }
 
             for offset in range(0, MAX_LISTINGS_TO_SEARCH, batch_size):
@@ -483,6 +551,41 @@ def main():
             for status, count in wysiwyg_counts.items():
                 print(f"  {status}: {count}")
 
+            # Collect WYSIWYG evidence for each shop
+            shop_wysiwyg_evidence = {}
+
+            wysiwyg_priority = {
+                "Likely WYSIWYG": 3,
+                "Possible WYSIWYG - Rare find": 2,
+                "Needs checking": 1,
+                "Likely random selection": 0,
+            }
+
+            for listing in listings:
+                shop_id = listing.get("shop_id")
+
+                if shop_id is None:
+                    continue
+
+                status = listing.get("wysiwyg_status", "Needs checking")
+
+                previous = shop_wysiwyg_evidence.get(shop_id)
+
+                if previous is None or (
+                    wysiwyg_priority[status]
+                    > wysiwyg_priority[previous["status"]]
+                ):
+                    listing_id = listing.get("listing_id")
+
+                    shop_wysiwyg_evidence[shop_id] = {
+                        "status": status,
+                        "listing_url": (
+                            f"https://www.etsy.com/listing/{listing_id}"
+                            if listing_id is not None
+                            else ""
+                        ),
+                    }
+
             # Collect unique shops from the search results
             unique_shop_ids = set()
 
@@ -510,14 +613,22 @@ def main():
 
                 shop_url = f"https://openapi.etsy.com/v3/application/shops/{shop_id}"
 
-                shop_response = requests.get(
+                shop_response = get_etsy_with_retries(
                     shop_url,
                     headers=headers,
-                    timeout=30
                 )
 
+                if shop_response is None:
+                    print("Skipping shop after repeated timeouts:", shop_id)
+                    continue
+
                 if shop_response.status_code != 200:
-                    print("Could not retrieve shop:", shop_id)
+                    print(
+                        "Could not retrieve shop:",
+                        shop_id,
+                        "HTTP status:",
+                        shop_response.status_code,
+                    )
                     continue
 
                 shop = shop_response.json()
@@ -526,8 +637,8 @@ def main():
                 rating = shop.get("review_average")
                 reviews = shop.get("review_count")
 
-                # Exclude shops already listed in excluded_shops.txt
-                if shop_name and shop_name.casefold() in excluded_shops:
+                # Exclude shops already listed in favourited_shops.txt
+                if shop_name and shop_name.casefold() in favourited_shops:
                     print(f"\nSkipping excluded shop: {shop_name}")
                     continue
 
@@ -557,6 +668,15 @@ def main():
                     and reviews >= MIN_SHOP_REVIEWS
                     and shop_age_days >= MIN_SHOP_AGE_DAYS
                 ):
+                    evidence = shop_wysiwyg_evidence.get(shop_id, {})
+
+                    shop["wysiwyg_status"] = evidence.get(
+                        "status", "Needs checking"
+                    )
+                    shop["evidence_listing_url"] = evidence.get(
+                        "listing_url", ""
+                    )
+
                     qualifying_shops.append(shop)
 
             print("\n" + "=" * 40)
@@ -661,10 +781,7 @@ def main():
                 print("Qualified:", shop.get("shop_name"))
 
             # Update the permanent Excel shop review list
-            output_file = os.path.join(
-                "output",
-                "gemstone_sellers_test.xlsx"
-            )
+            output_file = r"G:\My Drive\GemstoneCabFinder\gemstone_sellers_test.xlsx"
 
             update_review_list(
                 final_shops,
