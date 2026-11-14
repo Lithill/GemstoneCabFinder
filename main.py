@@ -307,7 +307,11 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
             "Evidence Listing URL": shop.get(
                 "evidence_listing_url", ""
             ),
-            "UK Delivery": "Needs checking",
+            "UK Delivery": (
+                "UK listing found"
+                if shop.get("uk_listing_found")
+                else "Needs checking"
+            ),
             "UK Postage GBP": None,
         })
 
@@ -620,6 +624,9 @@ def main():
                 if shop_id:
                     unique_shop_ids.add(shop_id)
 
+            # Shops with a matching cabochon listing in the UK-targeted search
+            uk_listing_shop_ids = set(unique_shop_ids)
+
             print("\nUnique shops found:", len(unique_shop_ids))
 
             # Check every unique shop
@@ -702,6 +709,9 @@ def main():
                         "listing_url", ""
                     )
 
+                    shop["uk_listing_found"] = (
+                        shop_id in uk_listing_shop_ids
+                    )
                     qualifying_shops.append(shop)
 
             print("\n" + "=" * 40)
