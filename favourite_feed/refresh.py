@@ -12,10 +12,15 @@ OVERLAP = timedelta(minutes=10)
 def refresh_shop(shop):
     shop_id = shop["shop_id"]
     started = datetime.now(timezone.utc)
+    with connect_database() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if "baseline_at" not in {r[1] for r in conn.execute("PRAGMA table_info(monitored_shops)")}:
+            conn.execute("ALTER TABLE monitored_shops ADD COLUMN baseline_at TEXT")
+            conn.execute("UPDATE monitored_shops SET baseline_at=last_checked WHERE last_checked IS NOT NULL")
     if not shop["last_checked"]:
         with connect_database() as conn:
-            conn.execute("UPDATE monitored_shops SET last_checked=? WHERE shop_id=?",
-                         (started.isoformat(), shop_id))
+            conn.execute("UPDATE monitored_shops SET last_checked=?, baseline_at=? WHERE shop_id=?",
+                         (started.isoformat(), started.isoformat(), shop_id))
         return "Baseline established (no backlog)"
     cutoff = int((datetime.fromisoformat(shop["last_checked"]) - OVERLAP).timestamp())
     upper = int(started.timestamp())
@@ -42,7 +47,7 @@ def refresh_shop(shop):
     # Do not import pre-baseline listings merely because of the overlap.
     # For subsequent checks the overlap may recover delayed API results.
     with connect_database() as conn:
-        baseline = conn.execute("SELECT added_at FROM monitored_shops WHERE shop_id=?",
+        baseline = conn.execute("SELECT baseline_at FROM monitored_shops WHERE shop_id=?",
                                 (shop_id,)).fetchone()[0]
     new_count = 0
     for listing_id, item in candidates.items():
