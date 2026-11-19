@@ -16,3 +16,7 @@ data/*_backup.db
 .vscode/
 data/favourite_feed.db
 data/favourite_feed.db-*
+
+# Isolated feed demo database
+data/favourite_feed_demo.db
+data/favourite_feed_demo.db-*
