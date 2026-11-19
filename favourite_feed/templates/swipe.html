@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Swipe — Gemstone feed</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head>
+<body><header><h1>Gemstone feed</h1><nav><a href="/">Grid</a><a href="/?mode=liked">Favourites</a><form method="post" action="{{ url_for('undo') }}"><input type="hidden" name="view" value="swipe"><button>Undo</button></form></nav></header>
+<main class="swipe-main"><h2>{{ count }} unseen</h2>
+{% if item %}<article id="swipe-card"><a id="photo-link" href="{{ url_for('detail',listing_id=item.listing_id) }}?view=swipe">{% if item.photo %}<img draggable="false" src="{{ item.photo }}" alt="{{ item.title }}">{% else %}<div class="placeholder">No photo</div>{% endif %}</a><div class="info"><strong>{{ item.title }}</strong><p>{{ item.shop_name }}</p>{% if item.price_divisor %}<b>{{ '%.2f'|format(item.price_amount/item.price_divisor) }} {{ item.currency_code }}</b>{% endif %}</div></article>
+<form class="actions swipe-actions" id="swipe-form" method="post" action="{{ url_for('action',listing_id=item.listing_id) }}"><input type="hidden" name="view" value="swipe"><button name="operation" value="seen">← Pass</button><button name="operation" value="like">♡ Like →</button></form><p class="swipe-hint">Swipe left to pass · right to like · tap photo to inspect</p>
+<script>
+const card = document.getElementById('swipe-card'), form = document.getElementById('swipe-form'), link = document.getElementById('photo-link');
+let start = null, suppress = false;
+link.addEventListener('pointerdown', e => { if (!e.isPrimary || e.button !== 0) return; suppress=false; start={x:e.clientX,y:e.clientY,id:e.pointerId}; link.setPointerCapture(e.pointerId); });
+link.addEventListener('pointermove', e => {if (!start || e.pointerId!==start.id) return; const x=e.clientX-start.x; if(Math.abs(x)>10) card.style.transform='translateX('+Math.max(-140,Math.min(140,x))+'px) rotate('+x/30+'deg)';});
+function reset(){start=null;card.style.transform='';}
+link.addEventListener('pointercancel', reset);
+link.addEventListener('pointerup', e=>{if(!start || e.pointerId!==start.id)return; const x=e.clientX-start.x,y=e.clientY-start.y;reset();if(Math.abs(x)>15)suppress=true;if(Math.abs(x)>75 && Math.abs(x)>Math.abs(y)*1.3){form.requestSubmit(form.querySelector('button[value="'+(x>0?'like':'seen')+'"]'));}});
+link.addEventListener('click',e=>{if(suppress){e.preventDefault();suppress=false;}});
+</script>{% else %}<p>You're all caught up!</p>{% endif %}</main></body></html>
