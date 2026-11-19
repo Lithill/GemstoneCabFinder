@@ -68,6 +68,8 @@ def index():
     listings = [r for r in rows if
                 (mode == "liked" and r["liked"]) or
                 (mode == "unseen" and not r["seen_at"] and is_visible(r["title"]))]
+    if mode == "liked":
+        listings.sort(key=lambda row: (row["seen_at"] or "", row["listing_id"]), reverse=True)
     if mode == "unseen" and request.args.get("view") == "swipe":
         return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings))
     return render_template("feed.html", listings=listings, mode=mode)
