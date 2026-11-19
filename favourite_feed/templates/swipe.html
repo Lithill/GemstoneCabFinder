@@ -53,7 +53,21 @@ function flyAway(operation){
   card.style.transform='translate3d('+direction*(window.innerWidth+card.offsetWidth)+'px,0,0) rotate('+direction*22+'deg)';
   card.style.opacity='0';
   let submitted=false;
-  function submit(){if(submitted)return;submitted=true;HTMLFormElement.prototype.submit.call(form);}
+  async function submit(){
+    if(submitted)return;
+    submitted=true;
+    try {
+      const response=await fetch(form.action,{method:'POST',headers:{'X-Feed-Action':'swipe'},body:new URLSearchParams({operation:operation,view:'swipe'}),cache:'no-store'});
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      const saved=await response.json();
+      if(!saved.seen || (operation==='like' && !saved.liked))throw new Error('Saved state did not match swipe');
+      window.location.replace('/?view=swipe');
+    } catch(error){
+      busy=false; suppress=false; field.remove();
+      card.style.opacity='1'; reset();
+      alert('Could not confirm '+operation+': '+error.message+'. Refresh the feed before retrying.');
+    }
+  }
   card.addEventListener('transitionend',submit,{once:true});
   setTimeout(submit,320);
 }
