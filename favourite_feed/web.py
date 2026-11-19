@@ -2,7 +2,8 @@
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, abort, redirect, url_for, jsonify
 from favourite_feed.database import connect_database, setup_database
-from favourite_feed.filters import is_visible
+from favourite_feed.filters import is_visible, DEFAULT_EXCLUSIONS, DEFAULT_PREFERENCES
+import json
 
 app = Flask(__name__)
 
@@ -11,6 +12,22 @@ def prevent_stale_feed(response):
     response.headers["Cache-Control"] = "no-store"
     return response
 
+
+def preferences(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS feed_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+    row = conn.execute("SELECT value FROM feed_settings WHERE id=1").fetchone()
+    return json.loads(row[0]) if row else dict(exclusions=list(DEFAULT_EXCLUSIONS), preferences=list(DEFAULT_PREFERENCES), preferred_only=False, show_excluded=False)
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    with connect_database() as conn:
+        current = preferences(conn)
+        if request.method == "POST":
+            current = {key: list(dict.fromkeys(v.strip() for v in request.form.get(key, "").splitlines() if v.strip())) for key in ("exclusions", "preferences")}
+            current.update(preferred_only="preferred_only" in request.form, show_excluded="show_excluded" in request.form)
+            conn.execute("INSERT OR REPLACE INTO feed_settings VALUES (1, ?)", (json.dumps(current),))
+            return redirect(url_for("index"))
+    return render_template("settings.html", settings=current)
 
 def ensure_history(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS feed_actions (
@@ -58,6 +75,7 @@ def undo():
 def index():
     mode = request.args.get("mode", "unseen")
     with connect_database() as conn:
+        filters = preferences(conn)
         rows = conn.execute("""
             SELECT l.*, s.shop_name,
                 (SELECT image_url FROM listing_images i
@@ -67,7 +85,7 @@ def index():
         """).fetchall()
     listings = [r for r in rows if
                 (mode == "liked" and r["liked"]) or
-                (mode == "unseen" and not r["seen_at"] and is_visible(r["title"]))]
+                (mode == "unseen" and not r["seen_at"] and is_visible(r["title"], **filters))]
     if mode == "liked":
         listings.sort(key=lambda row: (row["seen_at"] or "", row["listing_id"]), reverse=True)
     if mode == "unseen" and request.args.get("view") == "swipe":
