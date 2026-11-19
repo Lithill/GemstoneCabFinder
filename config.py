@@ -41,6 +41,9 @@ GEMSTONES = [
     "nellite",
     "fluorite",
     "charoite",
+    "cosmic swirl",
+    "wrasse snake skin",
+    "opalized petrified wood",
 ]
 
 SEARCH_TERMS = list(dict.fromkeys(
@@ -54,7 +57,12 @@ SEARCH_TERMS = list(dict.fromkeys(
     + [f"{gemstone} cabochon" for gemstone in GEMSTONES]
 ))
 
-SEARCH_TERMS = SEARCH_TERMS[:12]
+# Retain the existing search limit, plus the newly requested gemstones.
+SEARCH_TERMS = list(dict.fromkeys(SEARCH_TERMS[:12] + [
+    "cosmic swirl",
+    "wrasse snake skin",
+    "opalized petrified wood",
+]))
 
 TARGET_COUNTRIES = [
     "India",
