@@ -28,7 +28,7 @@ def action(listing_id):
                      (listing_id, row["seen_at"], row["liked"]))
         conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?",
                      (datetime.now(timezone.utc).isoformat(), int(operation == "like" or row["liked"]), listing_id))
-    return redirect(url_for("index"))
+    return redirect(url_for("index", view="swipe" if request.form.get("view") == "swipe" else "grid"))
 
 
 @app.post("/undo")
@@ -41,7 +41,7 @@ def undo():
             conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?",
                          (row["old_seen"], row["old_liked"], row["listing_id"]))
             conn.execute("DELETE FROM feed_actions WHERE action_id=?", (row["action_id"],))
-    return redirect(url_for("index"))
+    return redirect(url_for("index", view="swipe" if request.form.get("view") == "swipe" else "grid"))
 
 
 @app.get("/")
@@ -58,6 +58,8 @@ def index():
     listings = [r for r in rows if
                 (mode == "liked" and r["liked"]) or
                 (mode == "unseen" and not r["seen_at"] and is_visible(r["title"]))]
+    if mode == "unseen" and request.args.get("view") == "swipe":
+        return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings))
     return render_template("feed.html", listings=listings, mode=mode)
 
 
