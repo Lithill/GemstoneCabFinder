@@ -1,10 +1,15 @@
 """Local-only prototype; authentication required before public deployment."""
 from datetime import datetime, timezone
-from flask import Flask, render_template, request, abort, redirect, url_for
+from flask import Flask, render_template, request, abort, redirect, url_for, jsonify
 from favourite_feed.database import connect_database, setup_database
 from favourite_feed.filters import is_visible
 
 app = Flask(__name__)
+
+@app.after_request
+def prevent_stale_feed(response):
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def ensure_history(conn):
@@ -28,6 +33,11 @@ def action(listing_id):
                      (listing_id, row["seen_at"], row["liked"]))
         conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?",
                      (datetime.now(timezone.utc).isoformat(), int(operation == "like" or row["liked"]), listing_id))
+    print(f"Feed action: {listing_id} operation={operation}", flush=True)
+    if request.headers.get("X-Feed-Action") == "swipe":
+        with connect_database() as conn:
+            saved = conn.execute("SELECT liked, seen_at FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+        return jsonify(listing_id=listing_id, liked=bool(saved["liked"]), seen=bool(saved["seen_at"]))
     return redirect(url_for("index", view="swipe" if request.form.get("view") == "swipe" else "grid"))
 
 
