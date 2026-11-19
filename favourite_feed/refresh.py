@@ -78,12 +78,18 @@ def refresh_shop(shop):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--shop", action="append", help="Exact shop name; repeat to select multiple shops")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be positive")
     setup_database()
     with connect_database() as conn:
         shops = conn.execute("SELECT * FROM monitored_shops WHERE is_active=1 ORDER BY shop_id").fetchall()
+    if args.shop:
+        shops = [shop for shop in shops if shop["shop_name"] in args.shop]
+        missing = set(args.shop) - {shop["shop_name"] for shop in shops}
+        if missing:
+            parser.error("Unknown active shops: " + ", ".join(sorted(missing)))
     shops = shops[:args.limit]
     failures = []
     for i, shop in enumerate(shops, 1):
