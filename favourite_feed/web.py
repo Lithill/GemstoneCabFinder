@@ -1,9 +1,47 @@
 """Local-only prototype; authentication required before public deployment."""
+from datetime import datetime, timezone
 from flask import Flask, render_template, request, abort, redirect, url_for
 from favourite_feed.database import connect_database, setup_database
 from favourite_feed.filters import is_visible
 
 app = Flask(__name__)
+
+
+def ensure_history(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS feed_actions (
+        action_id INTEGER PRIMARY KEY, listing_id INTEGER NOT NULL,
+        old_seen TEXT, old_liked INTEGER NOT NULL)""")
+
+
+@app.post("/action/<int:listing_id>")
+def action(listing_id):
+    operation = request.form.get("operation")
+    if operation not in ("seen", "like"):
+        abort(400)
+    with connect_database() as conn:
+        ensure_history(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT seen_at, liked FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+        if row is None:
+            abort(404)
+        conn.execute("INSERT INTO feed_actions(listing_id, old_seen, old_liked) VALUES (?, ?, ?)",
+                     (listing_id, row["seen_at"], row["liked"]))
+        conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?",
+                     (datetime.now(timezone.utc).isoformat(), int(operation == "like" or row["liked"]), listing_id))
+    return redirect(url_for("index"))
+
+
+@app.post("/undo")
+def undo():
+    with connect_database() as conn:
+        ensure_history(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM feed_actions ORDER BY action_id DESC LIMIT 1").fetchone()
+        if row:
+            conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?",
+                         (row["old_seen"], row["old_liked"], row["listing_id"]))
+            conn.execute("DELETE FROM feed_actions WHERE action_id=?", (row["action_id"],))
+    return redirect(url_for("index"))
 
 
 @app.get("/")
