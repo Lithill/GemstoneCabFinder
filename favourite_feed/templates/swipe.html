@@ -7,34 +7,60 @@
 <script>
 const card = document.getElementById('swipe-card');
 const form = document.getElementById('swipe-form');
-const link = document.getElementById('photo-link');
-let start = null, suppress = false;
+let start = null, suppress = false, busy = false;
+card.style.touchAction = 'pan-y';
+card.style.userSelect = 'none';
+card.style.cursor = 'grab';
 card.addEventListener('dragstart', e => e.preventDefault());
 card.addEventListener('pointerdown', e => {
-  if (!e.isPrimary || e.button !== 0) return;
+  if (busy || !e.isPrimary || e.button !== 0) return;
   suppress = false;
+  card.style.transition = 'none';
   start = {x:e.clientX,y:e.clientY,id:e.pointerId};
-  if(e.pointerType === 'mouse') e.preventDefault();
 });
 window.addEventListener('pointermove', e => {
-  if (!start || e.pointerId !== start.id) return;
+  if (!start || e.pointerId !== start.id || busy) return;
   const x=e.clientX-start.x, y=e.clientY-start.y;
-  if(Math.abs(x)>12 && Math.abs(x)>Math.abs(y)) {
+  if(Math.abs(x)>10 && Math.abs(x)>Math.abs(y)) {
     suppress=true;
-    card.style.transform='translateX('+Math.max(-140,Math.min(140,x))+'px) rotate('+Math.max(-8,Math.min(8,x/30))+'deg)';
+    card.style.transform='translate3d('+x+'px,0,0) rotate('+Math.max(-18,Math.min(18,x/22))+'deg)';
   }
 });
-function reset(){start=null;card.style.transform='';}
+function reset(){
+  start=null;
+  card.style.transition='transform 180ms ease-out';
+  card.style.transform='';
+}
 window.addEventListener('pointercancel', reset);
 window.addEventListener('pointerup', e=>{
-  if(!start || e.pointerId!==start.id)return;
+  if(!start || e.pointerId!==start.id || busy)return;
   const x=e.clientX-start.x,y=e.clientY-start.y;
-  reset();
+  start=null;
   if(Math.abs(x)>15)suppress=true;
-  if(Math.abs(x)>50 && Math.abs(x)>Math.abs(y)*1.2){
-    suppress=true;
-    form.querySelector('button[value="'+(x>0?'like':'seen')+'"]').click();
-  }
+  if(Math.abs(x)>Math.min(100,card.offsetWidth*.22) && Math.abs(x)>Math.abs(y)*1.2){
+    flyAway(x>0?'like':'seen');
+  } else reset();
 });
-card.addEventListener('click', e=>{if(suppress){e.preventDefault();e.stopPropagation();suppress=false;}},true);
+function flyAway(operation){
+  if(busy)return;
+  busy=true;
+  suppress=true;
+  const direction=operation==='like'?1:-1;
+  const field=document.createElement('input');
+  field.type='hidden';field.name='operation';field.value=operation;
+  form.appendChild(field);
+  card.style.transition='transform 260ms ease-out, opacity 260ms ease-out';
+  card.style.transform='translate3d('+direction*(window.innerWidth+card.offsetWidth)+'px,0,0) rotate('+direction*22+'deg)';
+  card.style.opacity='0';
+  let submitted=false;
+  function submit(){if(submitted)return;submitted=true;HTMLFormElement.prototype.submit.call(form);}
+  card.addEventListener('transitionend',submit,{once:true});
+  setTimeout(submit,320);
+}
+form.addEventListener('submit',e=>{
+  e.preventDefault();
+  if(e.submitter)flyAway(e.submitter.value);
+});
+card.addEventListener('click', e=>{if(suppress || busy){e.preventDefault();e.stopPropagation();}},true);
+window.addEventListener('pageshow', e=>{if(e.persisted)location.reload();});
 </script>{% else %}<p>You're all caught up!</p>{% endif %}</main></body></html>
