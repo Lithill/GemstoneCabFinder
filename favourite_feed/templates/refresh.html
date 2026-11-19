@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Refresh shops</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head><body><header><h1>Refresh shops</h1><a href="/">Back to feed</a></header><main style="max-width:650px">
+{% if demo %}<p><strong>Demo database:</strong> only the three sample shops will be checked.</p>{% endif %}
+<p>First checks establish a baseline without importing old listings. Keep this page open until the refresh finishes.</p>
+<button id="start">Start refresh</button> <button id="stop" disabled>Stop after current shop</button>
+<p><progress id="progress" value="0" max="1" style="width:100%;height:22px"></progress></p><h2 id="status" aria-live="polite">Ready</h2><p id="counts"></p><p id="current"></p><ul id="failures"></ul><a href="/">Return to new listings</a>
+<script>
+const start=document.getElementById('start'),stop=document.getElementById('stop'),progress=document.getElementById('progress'),status=document.getElementById('status'),counts=document.getElementById('counts'),current=document.getElementById('current'),failures=document.getElementById('failures');
+let running=false,cancel=false;
+stop.onclick=()=>{cancel=true;stop.disabled=true;};
+window.addEventListener('beforeunload',e=>{if(running){e.preventDefault();e.returnValue='';}});
+async function get(url,options){const r=await fetch(url,options);const data=await r.json();if(!r.ok)throw Error(data.error||('HTTP '+r.status));return data;}
+start.onclick=async()=>{
+ if(running)return;running=true;cancel=false;start.disabled=true;stop.disabled=false;failures.replaceChildren();progress.value=0;
+ let done=0,added=0,failed=0,baseline=0,total=0;
+ function update(){status.textContent=done+' / '+total+' shops processed';counts.textContent=added+' new listings · '+baseline+' baselines · '+failed+' failures';progress.max=Math.max(total,1);progress.value=done;}
+ try{
+ const shops=await get('/refresh/shops');total=shops.length;update();
+ for(const shop of shops){if(cancel)break;current.textContent='Checking '+shop.shop_name+'…';
+ let halt=false;
+ try{const result=await get('/refresh/shop/'+shop.shop_id,{method:'POST'});added+=result.new;if(result.baseline)baseline++;if(result.error)throw Error(result.error);}
+ catch(e){failed++;const li=document.createElement('li');li.textContent=shop.shop_name+': '+e.message;failures.appendChild(li);halt=/rate limit|another shop|429|failed to fetch/i.test(e.message);}
+ done++;update();if(halt)break;
+ }
+ current.textContent=done===total?'Refresh finished.':'Refresh stopped. '+(total-done)+' shops not checked.';
+ }catch(e){current.textContent='Refresh failed: '+e.message;}
+ finally{running=false;start.disabled=false;stop.disabled=true;}
+};
+</script></main></body></html>
