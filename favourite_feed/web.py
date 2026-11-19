@@ -38,7 +38,7 @@ def ensure_history(conn):
 @app.post("/action/<int:listing_id>")
 def action(listing_id):
     operation = request.form.get("operation")
-    if operation not in ("seen", "like"):
+    if operation not in ("seen", "like", "unseen", "unlike"):
         abort(400)
     with connect_database() as conn:
         ensure_history(conn)
@@ -48,14 +48,15 @@ def action(listing_id):
             abort(404)
         conn.execute("INSERT INTO feed_actions(listing_id, old_seen, old_liked) VALUES (?, ?, ?)",
                      (listing_id, row["seen_at"], row["liked"]))
-        conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?",
-                     (datetime.now(timezone.utc).isoformat(), int(operation == "like" or row["liked"]), listing_id))
+        seen = None if operation == "unseen" else (datetime.now(timezone.utc).isoformat() if operation in ("seen", "like") else row["seen_at"])
+        liked = 0 if operation == "unlike" else int(operation == "like" or row["liked"])
+        conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?", (seen, liked, listing_id))
     print(f"Feed action: {listing_id} operation={operation}", flush=True)
     if request.headers.get("X-Feed-Action") == "swipe":
         with connect_database() as conn:
             saved = conn.execute("SELECT liked, seen_at FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
         return jsonify(listing_id=listing_id, liked=bool(saved["liked"]), seen=bool(saved["seen_at"]))
-    return redirect(url_for("index", view="swipe" if request.form.get("view") == "swipe" else "grid"))
+    return redirect(url_for("index", mode=request.form.get("mode", "unseen"), view="swipe" if request.form.get("view") == "swipe" else "grid"))
 
 
 @app.post("/undo")
@@ -68,7 +69,7 @@ def undo():
             conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?",
                          (row["old_seen"], row["old_liked"], row["listing_id"]))
             conn.execute("DELETE FROM feed_actions WHERE action_id=?", (row["action_id"],))
-    return redirect(url_for("index", view="swipe" if request.form.get("view") == "swipe" else "grid"))
+    return redirect(url_for("index", mode=request.form.get("mode", "unseen"), view="swipe" if request.form.get("view") == "swipe" else "grid"))
 
 
 @app.get("/")
@@ -85,6 +86,7 @@ def index():
         """).fetchall()
     listings = [r for r in rows if
                 (mode == "liked" and r["liked"]) or
+                (mode == "seen" and r["seen_at"]) or
                 (mode == "unseen" and not r["seen_at"] and is_visible(r["title"], **filters))]
     if mode == "liked":
         listings.sort(key=lambda row: (row["seen_at"] or "", row["listing_id"]), reverse=True)
@@ -92,6 +94,19 @@ def index():
         return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings))
     return render_template("feed.html", listings=listings, mode=mode)
 
+
+@app.post("/etsy/<int:listing_id>")
+def etsy(listing_id):
+    with connect_database() as conn:
+        ensure_history(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+        if not row or not (row["listing_url"] or "").startswith("https://www.etsy.com/"):
+            abort(404)
+        if not row["seen_at"]:
+            conn.execute("INSERT INTO feed_actions(listing_id,old_seen,old_liked) VALUES (?,?,?)", (listing_id,row["seen_at"],row["liked"]))
+            conn.execute("UPDATE listings SET seen_at=? WHERE listing_id=?", (datetime.now(timezone.utc).isoformat(),listing_id))
+    return redirect(row["listing_url"], code=303)
 
 @app.get("/listing/<int:listing_id>")
 def detail(listing_id):
