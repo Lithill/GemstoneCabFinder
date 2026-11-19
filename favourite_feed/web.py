@@ -5,6 +5,7 @@ from favourite_feed.database import connect_database, setup_database
 from favourite_feed.filters import is_visible, DEFAULT_EXCLUSIONS, DEFAULT_PREFERENCES
 import json
 from threading import Lock
+from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database
 
@@ -76,6 +77,14 @@ def undo():
     return redirect(url_for("index", mode=request.form.get("mode", "unseen"), view="swipe" if request.form.get("view") == "swipe" else "grid"))
 
 
+@app.context_processor
+def currency_context():
+    return {"price_display": price_context()}
+
+@app.post("/refresh/rates")
+def refresh_rates():
+    return jsonify(updated=update_rates())
+
 @app.get("/refresh")
 def refresh_page():
     return render_template("refresh.html", demo=database.DB_PATH.name == "favourite_feed_demo.db")
@@ -85,6 +94,22 @@ def refresh_shops():
     with connect_database() as conn:
         shops = conn.execute("SELECT shop_id, shop_name, last_checked FROM monitored_shops WHERE is_active=1 ORDER BY shop_id").fetchall()
     return jsonify([dict(row) for row in shops])
+
+@app.post("/refresh/batch")
+def refresh_batch():
+    ids = request.get_json(silent=True)
+    if not isinstance(ids, list) or not 1 <= len(ids) <= 5 or any(type(i) is not int or i <= 0 for i in ids):
+        abort(400)
+    results = []
+    for shop_id in ids:
+        response = refresh_one(shop_id)
+        if isinstance(response, tuple):
+            return response
+        result = response.get_json()
+        results.append(result)
+        if result.get("error") and "rate limit" in result["error"].lower():
+            break
+    return jsonify(results)
 
 @app.post("/refresh/shop/<int:shop_id>")
 def refresh_one(shop_id):
