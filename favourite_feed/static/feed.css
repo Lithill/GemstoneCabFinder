@@ -2,3 +2,5 @@
 .actions{display:flex;gap:8px;padding:0 12px 12px}.actions button{flex:1}button{font:inherit;cursor:pointer;border:1px solid #c6d4ca;border-radius:8px;background:white;color:#38654b;padding:9px 12px}button[value=like]{background:#38654b;color:white}button:hover{filter:brightness(.95)}nav{align-items:center;flex-wrap:wrap}
 
 .swipe-main{max-width:540px;overflow:hidden}.swipe-main article img{max-height:58vh;object-fit:contain}.swipe-main #photo-link{display:block;touch-action:pan-y;user-select:none}.swipe-actions{padding:14px 0}.swipe-actions button{min-height:48px}.swipe-hint{text-align:center;color:#777;font-size:.85rem}
+
+body:has(.swipe-main){overflow-x:hidden}.swipe-main{overflow:visible}#swipe-card{will-change:transform;touch-action:pan-y}#swipe-card img{-webkit-user-drag:none}
