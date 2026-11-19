@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from favourite_feed.database import PROJECT_ROOT
 
 BASE_URL = "https://openapi.etsy.com/v3/application"
-REQUEST_INTERVAL = 0.4
+REQUEST_INTERVAL = 0.25
+SESSION = requests.Session()
 
 
 def get_headers():
@@ -24,7 +25,7 @@ def etsy_get(endpoint, params=None):
     for attempt in range(3):
         time.sleep(REQUEST_INTERVAL)
         try:
-            response = requests.get(
+            response = SESSION.get(
                 f"{BASE_URL}/{endpoint.lstrip('/')}",
                 headers=headers, params=params, timeout=30
             )
