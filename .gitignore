@@ -14,3 +14,5 @@ data/etsy_favourite_shops.csv
 data/etsy_favourites_complete.csv
 data/*_backup.db
 .vscode/
+data/favourite_feed.db
+data/favourite_feed.db-*
