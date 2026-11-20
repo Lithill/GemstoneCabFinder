@@ -12,27 +12,13 @@ from favourite_feed import database, refresh_jobs
 app = Flask(__name__)
 refresh_lock = Lock()
 
-# Explicit opt-in only. The live site keeps its non-saving public prototype
-# until private login is configured and a separate deployment is approved.
-# The isolated module imports cryptography; do not load it on existing installs.
+# Opt-in private preview only; disabled on the live installation by default.
+# This module and its cryptography dependency are not loaded unless enabled.
 import os
 if os.environ.get("HEALTH_TRACKER_PREVIEW_ENABLED") == "1":
-    # Register the same audited login blueprint and protected preview view
-    # without introducing any health-data write endpoint.
-    from favourite_feed.health_auth import health_auth, require_health_login
-    app.register_blueprint(health_auth)
+    from favourite_feed.health_staging import register_private_preview
+    register_private_preview(app)
 
-    @app.get("/private-symptom-tracker")
-    @require_health_login
-    def private_symptom_tracker():
-        response = app.make_response(render_template("symptom_tracker.html"))
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self'; "
-            "img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-        )
-        response.headers["Referrer-Policy"] = "no-referrer"
-        return response
 
 @app.after_request
 def prevent_stale_feed(response):
