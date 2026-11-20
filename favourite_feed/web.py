@@ -191,6 +191,14 @@ def feed_breakdown(rows, filters, refresh_status):
     return {"overall": overall, "run": run}
 
 
+@app.get("/symptom-tracker")
+def symptom_tracker():
+    """Read-only prototype: no health data is accepted or stored."""
+    response = app.make_response(render_template("symptom_tracker.html"))
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+    return response
+
+
 @app.get("/dashboard")
 def dashboard():
     """App launcher; existing / remains the gemstone feed."""
