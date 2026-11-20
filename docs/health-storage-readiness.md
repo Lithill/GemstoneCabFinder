@@ -1,6 +1,6 @@
 # Health tracker: security staging (NOT LIVE)
 
-This branch contains an **offline-only** encrypted SQLite vault foundation.
+This branch contains an **offline-only** encrypted SQLite vault foundation and an isolated health login blueprint that is **not registered with the Flask app**.
 The existing `/symptom-tracker` remains a non-saving prototype. No health API,
 login, cookies, health-data writes or data migration have been enabled.
 
@@ -16,7 +16,7 @@ login, cookies, health-data writes or data migration have been enabled.
 
 ## Must complete before health data collection
 
-1. Build a separate authenticated tracker login (strong password, scrypt verifier, secure session cookie, session rotation, idle expiry, CSRF defense, persistent brute-force throttling, login/logout tests). Never reuse the gemstone site's weak shared password.
+1. Review and test the staged, **unregistered** `health_auth` blueprint: strong password verifier, secure signed session cookie with 20-minute expiry, login CSRF token, and persistent per-address login throttling. Add a usable logout form, session invalidation/rotation strategy, stronger abuse protection, and automated login/logout/security tests before registering any routes. Never reuse the gemstone site's weak shared password.
 2. Ensure all read/write routes require authentication, use no-store caching and a restrictive CSP, and never log answers. Disable browser caching of sensitive pages.
 3. Test server-side per-day upsert and prefilled guided/quick check-ins, including timezone/date boundaries and period skip behavior.
 4. Test encrypted backup, off-host copy, recovery, and restore drills; agree on backup cadence and retention. Keep secrets out of backups and version control.
