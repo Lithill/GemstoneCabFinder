@@ -92,6 +92,11 @@ class HealthLoginTests(unittest.TestCase):
         self.assertEqual(response.status_code, 429)
         self.assertIn("Retry-After", response.headers)
 
+    def test_oversized_password_is_rejected_before_hashing(self):
+        with patch.object(health_auth, "check_password", side_effect=AssertionError("hashing must not run")):
+            response = self._login("x" * 1025)
+        self.assertEqual(response.status_code, 413)
+
     def test_missing_configuration_refuses_login(self):
         with patch.dict(os.environ, {"HEALTH_PASSWORD_HASH": ""}):
             self.assertEqual(self.client.get("/health-auth/login").status_code, 503)
