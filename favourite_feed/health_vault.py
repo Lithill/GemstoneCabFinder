@@ -68,10 +68,8 @@ def provision(path: Path = DEFAULT_PATH) -> None:
     connection = sqlite3.connect(path)
     try:
         connection.execute("""CREATE TABLE entries (
-            day TEXT NOT NULL, question TEXT NOT NULL,
-            encrypted_payload BLOB NOT NULL,
-            updated_at TEXT NOT NULL,
-            PRIMARY KEY(day, question)
+            entry_id TEXT PRIMARY KEY,
+            encrypted_payload BLOB NOT NULL
         )""")
         connection.execute("CREATE TABLE vault_meta (key TEXT PRIMARY KEY, value BLOB NOT NULL)")
         connection.execute("INSERT INTO vault_meta VALUES ('key_check', ?)", (Fernet(_key()).encrypt(b'health-vault-v1'),))
@@ -92,6 +90,11 @@ def _verified(conn):
         raise RuntimeError("Wrong health vault key.") from exc
 
 
+def _entry_id(day: str, question: str) -> str:
+    """Deterministic secret lookup without exposing dates or symptom names."""
+    return hmac.new(_key(), json.dumps([day, question], separators=(",", ":"), ensure_ascii=False).encode("utf-8"), hashlib.sha256).hexdigest()
+
+
 def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> None:
     """Offline API only. Not connected to web routes or the prototype."""
     from datetime import date
@@ -99,23 +102,25 @@ def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> Non
         raise ValueError("Invalid date or question.")
     if not isinstance(answer, dict):
         raise ValueError("Answer must be an object.")
-    payload = Fernet(_key()).encrypt(json.dumps(answer, ensure_ascii=False).encode("utf-8"))
+    payload = Fernet(_key()).encrypt(json.dumps({"day": day, "question": question, "answer": answer}, ensure_ascii=False).encode("utf-8"))
     with _connect(path) as conn:
         _verified(conn)
-        conn.execute("""INSERT INTO entries (day, question, encrypted_payload, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(day, question) DO UPDATE SET
-            encrypted_payload=excluded.encrypted_payload, updated_at=excluded.updated_at""",
-            (day, question, payload, datetime.now(timezone.utc).isoformat()))
+        conn.execute("""INSERT INTO entries (entry_id, encrypted_payload)
+            VALUES (?, ?)
+            ON CONFLICT(entry_id) DO UPDATE SET encrypted_payload=excluded.encrypted_payload""",
+            (_entry_id(day, question), payload))
 
 
 def get(day: str, question: str, path: Path = DEFAULT_PATH) -> dict | None:
     with _connect(path) as conn:
         _verified(conn)
-        row = conn.execute("SELECT encrypted_payload FROM entries WHERE day=? AND question=?", (day, question)).fetchone()
+        row = conn.execute("SELECT encrypted_payload FROM entries WHERE entry_id=?", (_entry_id(day, question),)).fetchone()
     if not row:
         return None
-    return json.loads(Fernet(_key()).decrypt(row[0]))
+    record = json.loads(Fernet(_key()).decrypt(row[0]))
+    if record.get("day") != day or record.get("question") != question:
+        raise RuntimeError("Health entry identity mismatch.")
+    return record["answer"]
 
 
 def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
