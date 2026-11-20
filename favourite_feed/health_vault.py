@@ -5,6 +5,7 @@ Install cryptography before provisioning. Keep secrets outside source control.
 """
 import base64
 import binascii
+from contextlib import closing
 import hashlib
 import hmac
 import json
@@ -125,7 +126,7 @@ def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> Non
     if len(serialized) > 16 * 1024:
         raise ValueError("Health entry exceeds the 16 KiB size limit.")
     payload = Fernet(_key()).encrypt(serialized)
-    with _connect(path) as conn:
+    with closing(_connect(path)) as conn, conn:
         _verified(conn)
         conn.execute("""INSERT INTO entries (entry_id, encrypted_payload)
             VALUES (?, ?)
@@ -134,7 +135,7 @@ def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> Non
 
 
 def get(day: str, question: str, path: Path = DEFAULT_PATH) -> dict | None:
-    with _connect(path) as conn:
+    with closing(_connect(path)) as conn, conn:
         _verified(conn)
         row = conn.execute("SELECT encrypted_payload FROM entries WHERE entry_id=?", (_entry_id(day, question),)).fetchone()
     if not row:
@@ -151,7 +152,7 @@ def delete(day: str, question: str, path: Path = DEFAULT_PATH) -> bool:
     from datetime import date
     if date.fromisoformat(day).isoformat() != day or not question or len(question) > 200:
         raise ValueError("Invalid date or question.")
-    with _connect(path) as conn:
+    with closing(_connect(path)) as conn, conn:
         _verified(conn)
         result = conn.execute("DELETE FROM entries WHERE entry_id=?", (_entry_id(day, question),))
         return result.rowcount == 1
@@ -162,7 +163,7 @@ def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
     destination = Path(destination).expanduser()
     if destination.exists() or destination.is_symlink():
         raise FileExistsError("Refusing to overwrite backup.")
-    with _connect(path) as source:
+    with closing(_connect(path)) as source:
         _verified(source)
         snapshot = sqlite3.connect(":memory:")
         try:
@@ -218,8 +219,8 @@ def _verify_encrypted_entries(conn) -> int:
 def verify_backup(source: Path) -> int:
     """Offline-only: authenticate a backup, check SQLite integrity, count entries.
 
-    Returns the number of encrypted records. Never decrypts individual answers
-    or writes a restored database.
+    Returns the number of authenticated, validated records without exposing
+    answers or writing a restored database.
     """
     source = Path(source).expanduser()
     if source.is_symlink() or not source.is_file():
