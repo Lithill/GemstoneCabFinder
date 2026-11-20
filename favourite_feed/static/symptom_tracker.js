@@ -142,23 +142,34 @@ $("guided-skip").addEventListener("click",()=>{step++;showStep();});
 $("guided-next").addEventListener("click",()=>{
   add(collect(questions[step],current));step++;showStep();
 });
-groups.forEach((g,i)=>el("option",{value:String(i),text:g.name},$("quick-category")));
+let quickCategory=0,quickSymptom=0;
+function radioChoices(container,title,items,selected,onSelect){
+  container.replaceChildren();
+  const fieldset=el("fieldset",{className:"tracker-radio-group"},container);
+  el("legend",{text:title},fieldset);
+  items.forEach((label,i)=>{
+    const row=el("label",{className:"tracker-radio-option"},fieldset);
+    const radio=el("input",{type:"radio",name:container.id,value:String(i)},row);
+    radio.checked=i===selected;
+    radio.addEventListener("change",()=>{if(radio.checked)onSelect(i);});
+    el("span",{text:label},row);
+  });
+}
 function quickOptions(){
-  const g=groups[Number($("quick-category").value)];
-  $("quick-symptom").replaceChildren();
-  g.items.forEach(([name],i)=>el("option",{value:String(i),text:name},$("quick-symptom")));
+  radioChoices($("quick-category"),"Category",groups.map(g=>g.name),quickCategory,i=>{
+    quickCategory=i;quickSymptom=0;quickOptions();
+  });
+  radioChoices($("quick-symptom"),"Symptom or measurement",groups[quickCategory].items.map(item=>item[0]),quickSymptom,i=>{
+    quickSymptom=i;quickFields();
+  });
   quickFields();
 }
 function quickFields(){
-  const g=groups[Number($("quick-category").value)];
-  const q=g.items[Number($("quick-symptom").value)];
-  current=fields($("quick-fields"),{name:q[0],type:q[1]});
+  const [name,type]=groups[quickCategory].items[quickSymptom];
+  current=fields($("quick-fields"),{name,type});
 }
-$("quick-category").addEventListener("change",quickOptions);
-$("quick-symptom").addEventListener("change",quickFields);
 $("quick-add").addEventListener("click",()=>{
-  const g=groups[Number($("quick-category").value)];
-  const [name,type]=g.items[Number($("quick-symptom").value)];
+  const [name,type]=groups[quickCategory].items[quickSymptom];
   if(!add(collect({name,type},current))){alert("Choose a value before adding this entry.");return;}
   quickFields();
 });
