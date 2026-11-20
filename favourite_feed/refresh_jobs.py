@@ -1,6 +1,4 @@
 """Resumable manual refresh. A browser request processes one shop at a time."""
-import json
-import sqlite3
 from datetime import datetime, timezone
 from favourite_feed.database import connect_database
 from favourite_feed.refresh import refresh_shop
@@ -19,7 +17,7 @@ def ensure(conn):
         );
         CREATE TABLE IF NOT EXISTS refresh_run_shops (
             run_id INTEGER NOT NULL, position INTEGER NOT NULL, shop_id INTEGER NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending', message TEXT,
+            status TEXT NOT NULL DEFAULT 'pending', claimed_at TEXT, message TEXT,
             new_listings INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(run_id, position)
         );
@@ -44,6 +42,9 @@ def start():
         conn.execute("BEGIN IMMEDIATE")
         existing = conn.execute("SELECT run_id FROM refresh_runs WHERE status IN ('running','paused') ORDER BY run_id DESC LIMIT 1").fetchone()
         if existing:
+            # Reclaim a shop only if its request was interrupted long ago.
+            conn.execute("""UPDATE refresh_run_shops SET status='pending', claimed_at=NULL
+                WHERE run_id=? AND status='working' AND claimed_at < datetime('now', '-10 minutes')""", (existing["run_id"],))
             conn.execute("UPDATE refresh_runs SET status='running' WHERE run_id=?", (existing["run_id"],))
             return snapshot_after(conn, existing["run_id"])
         shops = conn.execute("SELECT shop_id FROM monitored_shops WHERE is_active=1 ORDER BY shop_id").fetchall()
@@ -72,12 +73,14 @@ def step():
         run = conn.execute("SELECT * FROM refresh_runs WHERE status='running' ORDER BY run_id DESC LIMIT 1").fetchone()
         if not run:
             return snapshot()
+        conn.execute("""UPDATE refresh_run_shops SET status='pending', claimed_at=NULL
+            WHERE run_id=? AND status='working' AND claimed_at < datetime('now', '-10 minutes')""", (run["run_id"],))
         pending = conn.execute("SELECT * FROM refresh_run_shops WHERE run_id=? AND status='pending' ORDER BY position LIMIT 1", (run["run_id"],)).fetchone()
         if not pending:
             if not conn.execute("SELECT 1 FROM refresh_run_shops WHERE run_id=? AND status='working'", (run["run_id"],)).fetchone():
                 conn.execute("UPDATE refresh_runs SET status='completed', finished_at=? WHERE run_id=?", (now(),run["run_id"]))
             return snapshot_after(conn,run["run_id"])
-        conn.execute("UPDATE refresh_run_shops SET status='working' WHERE run_id=? AND position=?", (run["run_id"],pending["position"]))
+        conn.execute("UPDATE refresh_run_shops SET status='working', claimed_at=datetime('now') WHERE run_id=? AND position=?", (run["run_id"],pending["position"]))
         shop = conn.execute("SELECT * FROM monitored_shops WHERE shop_id=?", (pending["shop_id"],)).fetchone()
         before = conn.execute("SELECT COUNT(*) FROM listings WHERE shop_id=?", (pending["shop_id"],)).fetchone()[0]
     error = None
