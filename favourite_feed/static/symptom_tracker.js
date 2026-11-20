@@ -72,10 +72,10 @@ function fields(parent,q){
     inputs.answer=field(parent,"UTI status",null,[["","Not recorded"],["Suspected","Suspected"],["Confirmed","Confirmed"],["Symptoms","Urinary symptoms"],["Resolved","Resolved"]]);
     inputs.detail=field(parent,"Treatment or symptoms (optional)","text");
   }else if(q.type==="sleep"){
-    inputs.answer=field(parent,"Difficulty",null,[["","Not recorded"],["Mild","Mild"],["Moderate","Moderate"],["Severe","Severe"]]);
+    inputs.answer=field(parent,"Difficulty",null,[["","Not recorded"],["None","None"],["Mild","Mild"],["Moderate","Moderate"],["Severe","Severe"]]);
     inputs.hours=field(parent,"Hours slept (optional)","number");
   }else{
-    inputs.answer=field(parent,"Severity",null,[["","Not recorded"],["Mild","Mild"],["Moderate","Moderate"],["Severe","Severe"]]);
+    inputs.answer=field(parent,"Severity",null,[["","Not recorded"],["None","None"],["Mild","Mild"],["Moderate","Moderate"],["Severe","Severe"]]);
   }
   if(q.type!=="yesno"&&q.type!=="date"&&q.type!=="weight"){
     inputs.time=field(parent,"Time of day",null,[["","Any time"],["Morning","Morning"],["Afternoon","Afternoon"],["Evening","Evening"],["Night","Night"]]);
