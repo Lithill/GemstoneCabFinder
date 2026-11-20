@@ -27,3 +27,7 @@ metadata (dates, question names, update timestamps) remains plaintext.
 The database file itself is not fully encrypted. This distinction matters
 for health information; consider encrypting metadata or full-database encryption
 before production use. Encrypted backups encrypt the complete snapshot.
+
+## Automated offline checks
+
+The development branch includes `tests/test_health_auth.py`, `tests/test_health_vault.py`, and `.github/workflows/health-security-tests.yml`. The workflow runs on pushes to `feature/favourite-feed` using free GitHub-hosted runner capacity subject to the repository's Actions allowance. Check the actual workflow result before treating tests as passed; the presence of test code alone is not verification. The tests use only synthetic values and temporary databases, never production health data.
