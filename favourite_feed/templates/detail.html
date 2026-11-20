@@ -27,4 +27,4 @@ stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',e
 viewer.addEventListener('keydown',e=>{if(e.key==='ArrowRight')show(index+1);if(e.key==='ArrowLeft')show(index-1);});
 viewer.addEventListener('close',()=>{fingers.clear();gesture=pinch=null;});
 window.addEventListener('resize',draw);
-</script></body></html>
+</script><script src="{{ url_for('static',filename='refresh_worker.js') }}"></script></body></html>
