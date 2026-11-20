@@ -1,0 +1,29 @@
+# Health tracker: security staging (NOT LIVE)
+
+This branch contains an **offline-only** encrypted SQLite vault foundation.
+The existing `/symptom-tracker` remains a non-saving prototype. No health API,
+login, cookies, health-data writes or data migration have been enabled.
+
+## Secrets and setup (manual, later)
+
+- Install `cryptography` in the PythonAnywhere virtual environment.
+- Run `python3.12 -m scripts.health_vault_admin new-key` to generate a Fernet key.
+- Run `python3.12 -m scripts.health_vault_admin password-hash` to create a scrypt password verifier.
+- Keep `HEALTH_VAULT_KEY` and `HEALTH_PASSWORD_HASH` only in private server environment variables, never in GitHub, logs, or browser code. Use a distinct Flask session signing secret.
+- Run `python3.12 -m scripts.health_vault_admin provision` only after configuring the key. The database defaults to `~/.gemstonecabfinder-private/health_vault.db` (outside the repository). Parent permissions 0700, DB 0600.
+- An entry is uniquely keyed by ISO date + question, so an update replaces that day's answer.
+- To create an encrypted snapshot: `python3.12 -m scripts.health_vault_admin backup ~/private-backups/health-YYYY-MM-DD.backup`. Backups use the same vault key: protect the key separately. Verify restoration with `restore BACKUP NEW_DB_PATH`, then test the restored records using the key. Store a copy off-host. Do not commit backups.
+
+## Must complete before health data collection
+
+1. Build a separate authenticated tracker login (strong password, scrypt verifier, secure session cookie, session rotation, idle expiry, CSRF defense, persistent brute-force throttling, login/logout tests). Never reuse the gemstone site's weak shared password.
+2. Ensure all read/write routes require authentication, use no-store caching and a restrictive CSP, and never log answers. Disable browser caching of sensitive pages.
+3. Test server-side per-day upsert and prefilled guided/quick check-ins, including timezone/date boundaries and period skip behavior.
+4. Test encrypted backup, off-host copy, recovery, and restore drills; agree on backup cadence and retention. Keep secrets out of backups and version control.
+5. Assess free-hosting storage, backups, operational constraints, and the risks of storing sensitive health information on a shared free hosting tier. Confirm the user is comfortable with the risks before turning on collection.
+
+**Important:** Fernet encrypts individual record payloads at rest, but SQLite
+metadata (dates, question names, update timestamps) remains plaintext.
+The database file itself is not fully encrypted. This distinction matters
+for health information; consider encrypting metadata or full-database encryption
+before production use. Encrypted backups encrypt the complete snapshot.
