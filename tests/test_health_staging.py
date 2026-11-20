@@ -56,6 +56,9 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
             "csrf": csrf, "password": "integration test passphrase"
         })
         self.assertEqual(response.status_code, 303)
+        landing = self.client.get("/health-auth/")
+        self.assertEqual(landing.status_code, 200)
+        self.assertIn(b"/private-symptom-tracker", landing.data)
         tracker = self.client.get("/private-symptom-tracker")
         self.assertEqual(tracker.status_code, 200)
         self.assertIn(b"symptom", tracker.data.lower())
