@@ -115,8 +115,14 @@ function showMode(mode){
 }
 function guidedAdvance(){
   if(step>=questions.length)return;
-  add(collect(questions[step],current));
+  const question=questions[step];
+  const answer=current.answer.value;
+  add(collect(question,current));
   step++;
+  // No bleeding today: omit all remaining period questions in this check-in.
+  if(question.type==="period"&&answer==="None"){
+    while(step<questions.length&&questions[step].category==="Periods and bleeding")step++;
+  }
   showStep();
 }
 function guidedAutoAdvance(q){
@@ -149,6 +155,14 @@ function showStep(){
   $("guided-progress").textContent=(step+1)+" of "+questions.length;
   $("guided-bar").max=questions.length;$("guided-bar").value=step+1;
   current=fields($("guided-fields"),q);
+  if(q.type==="period"){
+    const answerGroup=$("guided-fields").querySelector(".tracker-radio-group");
+    answerGroup.addEventListener("change",event=>{
+      if(event.target.matches('input[type="radio"]')&&event.target.value==="None"){
+        guidedAdvance();
+      }
+    });
+  }
   if(["yesno","severity"].includes(q.type)){
     const notesField=current.notes.closest(".tracker-field");
     notesField.hidden=true;
@@ -165,7 +179,17 @@ $("guided-start").addEventListener("click",()=>{step=0;showMode("guided");});
 $("quick-start").addEventListener("click",()=>showMode("quick"));
 $("guided-exit").addEventListener("click",()=>showMode(null));
 $("quick-exit").addEventListener("click",()=>showMode(null));
-$("guided-back").addEventListener("click",()=>{if(step>0){step--;showStep();}});
+$("guided-back").addEventListener("click",()=>{
+  if(step>0){
+    step--;
+    // After skipping the period section, Back returns to the period-status question.
+    if(questions[step].category==="Periods and bleeding"){
+      const firstPeriod=questions.findIndex(q=>q.type==="period");
+      if(firstPeriod>=0)step=firstPeriod;
+    }
+    showStep();
+  }
+});
 $("guided-skip").addEventListener("click",()=>{step++;showStep();});
 $("guided-next").addEventListener("click",()=>{
   guidedAdvance();
