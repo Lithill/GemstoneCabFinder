@@ -7,7 +7,7 @@ import json
 from threading import Lock
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
-from favourite_feed import database
+from favourite_feed import database, refresh_jobs
 
 app = Flask(__name__)
 refresh_lock = Lock()
@@ -96,6 +96,22 @@ def currency_context():
 def refresh_rates():
     return jsonify(updated=update_rates())
 
+@app.get("/refresh/status")
+def refresh_status():
+    return jsonify(refresh_jobs.snapshot())
+
+@app.post("/refresh/start")
+def refresh_start():
+    return jsonify(refresh_jobs.start())
+
+@app.post("/refresh/pause")
+def refresh_pause():
+    return jsonify(refresh_jobs.pause())
+
+@app.post("/refresh/step")
+def refresh_step():
+    return jsonify(refresh_jobs.step())
+
 @app.get("/refresh")
 def refresh_page():
     return render_template("refresh.html", demo=database.DB_PATH.name == "favourite_feed_demo.db")
@@ -163,8 +179,8 @@ def index():
     if mode == "liked":
         listings.sort(key=lambda row: (row["seen_at"] or "", row["listing_id"]), reverse=True)
     if mode == "unseen" and request.args.get("view") == "swipe":
-        return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings))
-    return render_template("feed.html", listings=listings, mode=mode)
+        return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings), refresh_status=refresh_jobs.snapshot())
+    return render_template("feed.html", listings=listings, mode=mode, refresh_status=refresh_jobs.snapshot())
 
 
 @app.post("/etsy/<int:listing_id>")
