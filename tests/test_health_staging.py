@@ -29,6 +29,17 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         app.config.update(TESTING=True, SERVER_NAME="localhost")
         self.client = app.test_client()
 
+    def test_private_preview_has_no_health_write_routes(self):
+        rules = list(self.client.application.url_map.iter_rules())
+        private = [rule for rule in rules if rule.rule == "/private-symptom-tracker"]
+        self.assertEqual(len(private), 1)
+        self.assertEqual(private[0].methods - {"HEAD", "OPTIONS"}, {"GET"})
+        self.assertFalse(any("/health" in rule.rule and
+                             any(method in rule.methods for method in {"PUT", "PATCH", "DELETE"})
+                             for rule in rules))
+        self.assertEqual(self.client.post("/private-symptom-tracker",
+                                         json={"answer": "private"}).status_code, 405)
+
     def test_anonymous_user_cannot_view_tracker(self):
         response = self.client.get("/private-symptom-tracker")
         self.assertEqual(response.status_code, 303)
