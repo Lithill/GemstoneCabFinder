@@ -39,6 +39,25 @@ class HealthVaultTests(unittest.TestCase):
         self.assertNotIn(b"2026-11-20", raw)
         self.assertNotIn(b"Severe", raw)
 
+    def test_delete_only_targeted_day_and_question(self):
+        health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+        health_vault.put("2026-11-20", "Anxiety", {"answer": "Severe"}, self.db)
+        health_vault.put("2026-11-21", "Sleep", {"answer": "None"}, self.db)
+        self.assertTrue(health_vault.delete("2026-11-20", "Sleep", self.db))
+        self.assertFalse(health_vault.delete("2026-11-20", "Sleep", self.db))
+        self.assertIsNone(health_vault.get("2026-11-20", "Sleep", self.db))
+        self.assertEqual(health_vault.get("2026-11-20", "Anxiety", self.db), {"answer": "Severe"})
+        self.assertEqual(health_vault.get("2026-11-21", "Sleep", self.db), {"answer": "None"})
+
+    def test_delete_wrong_key_and_invalid_day_fail_closed(self):
+        health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+        with patch.dict(os.environ, {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
+            with self.assertRaisesRegex(RuntimeError, "Wrong health vault key"):
+                health_vault.delete("2026-11-20", "Sleep", self.db)
+        with self.assertRaises(ValueError):
+            health_vault.delete("not-a-day", "Sleep", self.db)
+        self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
+
     def test_backup_restore_and_wrong_key(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Moderate"}, self.db)
         backup = Path(self.tmp.name) / "backup.enc"
