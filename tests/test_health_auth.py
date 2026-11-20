@@ -73,6 +73,28 @@ class HealthLoginTests(unittest.TestCase):
         self.assertEqual(self.client.post("/health-auth/logout", data={"csrf": "wrong"}).status_code, 400)
         self.assertEqual(self.client.get("/health-auth/").status_code, 200)
 
+    def test_repeated_failed_passwords_lock_out_login(self):
+        # A distinct client address avoids influencing other test cases.
+        address = "198.51.100.23"
+        for _ in range(5):
+            response = self.client.post(
+                "/health-auth/login",
+                data={"password": "wrong", "csrf": self.login_csrf},
+                environ_overrides={"REMOTE_ADDR": address},
+            )
+            self.assertEqual(response.status_code, 401)
+        response = self.client.post(
+            "/health-auth/login",
+            data={"password": "a strong test password 123", "csrf": self.login_csrf},
+            environ_overrides={"REMOTE_ADDR": address},
+        )
+        self.assertEqual(response.status_code, 429)
+        self.assertIn("Retry-After", response.headers)
+
+    def test_missing_configuration_refuses_login(self):
+        with patch.dict(os.environ, {"HEALTH_PASSWORD_HASH": ""}):
+            self.assertEqual(self.client.get("/health-auth/login").status_code, 503)
+
     def test_session_is_http_only_secure_and_same_site_strict(self):
         response = self._login()
         cookie = next(v for v in response.headers.getlist("Set-Cookie") if "__Host-health_session=" in v)
