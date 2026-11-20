@@ -3,6 +3,7 @@
 No live health data, server configuration, or production database is used.
 """
 import os
+import json
 import sqlite3
 from pathlib import Path
 import tempfile
@@ -71,6 +72,25 @@ class HealthVaultTests(unittest.TestCase):
         with patch.dict(os.environ, {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
+
+    def test_backup_rejects_authenticated_but_invalid_entry_date(self):
+        # Even valid Fernet ciphertext and matching HMAC IDs must not bypass
+        # the data validation normally applied by put().
+        day, question = "not-a-date", "Sleep"
+        payload = Fernet(self.key.encode()).encrypt(json.dumps({
+            "day": day, "question": question, "answer": {"answer": "Mild"}
+        }).encode())
+        with sqlite3.connect(self.db) as conn:
+            conn.execute("INSERT INTO entries VALUES (?, ?)",
+                         (health_vault._entry_id(day, question), payload))
+        backup = Path(self.tmp.name) / "invalid-date.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        restored = Path(self.tmp.name) / "invalid-date-restored.db"
+        with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
+            health_vault.verify_backup(backup)
+        with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
+            health_vault.restore_backup(backup, restored)
+        self.assertFalse(restored.exists())
 
     def test_backup_with_tampered_encrypted_entry_is_rejected(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
