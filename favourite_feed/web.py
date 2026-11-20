@@ -21,7 +21,18 @@ def prevent_stale_feed(response):
 def preferences(conn):
     conn.execute("CREATE TABLE IF NOT EXISTS feed_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
     row = conn.execute("SELECT value FROM feed_settings WHERE id=1").fetchone()
-    return json.loads(row[0]) if row else dict(exclusions=list(DEFAULT_EXCLUSIONS), preferences=list(DEFAULT_PREFERENCES), preferred_only=False, show_excluded=False)
+    if row:
+        settings = json.loads(row[0])
+        # Upgrade previously saved settings once, preserving user-added exclusions.
+        # The marker lets users subsequently remove any default term permanently.
+        if not settings.get("finished_jewellery_defaults_v1"):
+            settings["exclusions"] = list(dict.fromkeys(
+                settings.get("exclusions", []) + list(DEFAULT_EXCLUSIONS)
+            ))
+            settings["finished_jewellery_defaults_v1"] = True
+            conn.execute("UPDATE feed_settings SET value=? WHERE id=1", (json.dumps(settings),))
+        return settings
+    return dict(exclusions=list(DEFAULT_EXCLUSIONS), preferences=list(DEFAULT_PREFERENCES), preferred_only=False, show_excluded=False, finished_jewellery_defaults_v1=True)
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
@@ -29,7 +40,7 @@ def settings():
         current = preferences(conn)
         if request.method == "POST":
             current = {key: list(dict.fromkeys(v.strip() for v in request.form.get(key, "").splitlines() if v.strip())) for key in ("exclusions", "preferences")}
-            current.update(preferred_only="preferred_only" in request.form, show_excluded="show_excluded" in request.form)
+            current.update(preferred_only="preferred_only" in request.form, show_excluded="show_excluded" in request.form, finished_jewellery_defaults_v1=True)
             conn.execute("INSERT OR REPLACE INTO feed_settings VALUES (1, ?)", (json.dumps(current),))
             return redirect(url_for("index"))
     return render_template("settings.html", settings=current)
