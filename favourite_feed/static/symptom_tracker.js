@@ -113,6 +113,25 @@ function showMode(mode){
   if(mode==="guided")showStep();
   if(mode==="quick")quickFields();
 }
+function guidedAdvance(){
+  if(step>=questions.length)return;
+  add(collect(questions[step],current));
+  step++;
+  showStep();
+}
+function guidedAutoAdvance(q){
+  // Multi-part questions need a deliberate Next tap so other fields aren't skipped.
+  if(!["yesno","severity"].includes(q.type))return;
+  const answerGroup=$("guided-fields").querySelector(".tracker-radio-group");
+  if(!answerGroup)return;
+  answerGroup.addEventListener("change",event=>{
+    if(!event.target.matches('input[type="radio"]'))return;
+    if(!event.target.value)return;
+    // If the user has chosen to add a note, let them finish before proceeding.
+    if($("guided-notes-toggle")?.checked)return;
+    guidedAdvance();
+  });
+}
 function showStep(){
   if(step>=questions.length){
     $("guided-question").textContent="Guided check-in complete";
@@ -130,6 +149,15 @@ function showStep(){
   $("guided-progress").textContent=(step+1)+" of "+questions.length;
   $("guided-bar").max=questions.length;$("guided-bar").value=step+1;
   current=fields($("guided-fields"),q);
+  if(["yesno","severity"].includes(q.type)){
+    const notesField=current.notes.closest(".tracker-field");
+    notesField.hidden=true;
+    const toggleLabel=el("label",{className:"tracker-notes-toggle"},$("guided-fields"));
+    const toggle=el("input",{type:"checkbox",id:"guided-notes-toggle"},toggleLabel);
+    el("span",{text:"Add a note before continuing"},toggleLabel);
+    toggle.addEventListener("change",()=>{notesField.hidden=!toggle.checked;if(toggle.checked)current.notes.focus();});
+    guidedAutoAdvance(q);
+  }
   $("guided-next").hidden=false;$("guided-skip").hidden=false;
   $("guided-back").disabled=step===0;
 }
@@ -140,7 +168,7 @@ $("quick-exit").addEventListener("click",()=>showMode(null));
 $("guided-back").addEventListener("click",()=>{if(step>0){step--;showStep();}});
 $("guided-skip").addEventListener("click",()=>{step++;showStep();});
 $("guided-next").addEventListener("click",()=>{
-  add(collect(questions[step],current));step++;showStep();
+  guidedAdvance();
 });
 let quickCategory=0,quickSymptom=0;
 function radioChoices(container,title,items,selected,onSelect){
