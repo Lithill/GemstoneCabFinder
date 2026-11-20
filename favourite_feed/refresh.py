@@ -6,7 +6,21 @@ from favourite_feed.database import connect_database, setup_database
 from favourite_feed.etsy_api import etsy_get
 
 PAGE_SIZE = 100
-OVERLAP = timedelta(minutes=10)
+OVERLAP = timedelta(hours=24)
+ACTIVATION_WINDOW_SECONDS = 120
+
+def inclusion_reason(item, baseline, cutoff, upper):
+    """Conservative signal for newly activated drafts; not proof of publication."""
+    original = int(item.get("original_creation_timestamp") or 0)
+    created = int(item.get("creation_timestamp") or 0)
+    state = int(item.get("state_timestamp") or 0)
+    if not cutoff <= created <= upper:
+        return "outside scan window"
+    if baseline <= original <= upper:
+        return "original creation after baseline"
+    if baseline <= state <= upper and abs(state - created) <= ACTIVATION_WINDOW_SECONDS:
+        return "possible draft publication: activation matches creation"
+    return "older original creation; no matching activation (possible renewal)"
 
 
 def refresh_shop(shop):
@@ -35,8 +49,8 @@ def refresh_shop(shop):
         if not rows:
             break
         for item in rows:
-            original = int(item["original_creation_timestamp"])
-            if cutoff <= original <= upper:
+            created = int(item.get("creation_timestamp") or 0)
+            if cutoff <= created <= upper:
                 candidates[item["listing_id"]] = item
         offset += len(rows)
         if offset >= data["count"] or int(rows[-1]["creation_timestamp"]) < cutoff:
@@ -49,9 +63,11 @@ def refresh_shop(shop):
     with connect_database() as conn:
         baseline = conn.execute("SELECT baseline_at FROM monitored_shops WHERE shop_id=?",
                                 (shop_id,)).fetchone()[0]
+    baseline_ts = int(datetime.fromisoformat(baseline).timestamp())
     new_count = 0
     for listing_id, item in candidates.items():
-        if listing_id in known or item["original_creation_timestamp"] < datetime.fromisoformat(baseline).timestamp():
+        reason = inclusion_reason(item, baseline_ts, cutoff, upper)
+        if listing_id in known or reason.startswith(("outside", "older")):
             continue
         images = etsy_get(f"listings/{listing_id}/images")["results"]
         price = item.get("price") or {}
@@ -65,7 +81,7 @@ def refresh_shop(shop):
             """, (listing_id, shop_id, html.unescape(item["title"]),
                   html.unescape(item.get("description") or ""), item.get("url"),
                   price.get("amount"), price.get("divisor"), price.get("currency_code"),
-                  item["original_creation_timestamp"], started.isoformat()))
+                  item["state_timestamp"] if int(item.get("original_creation_timestamp") or 0) < baseline_ts else item["original_creation_timestamp"], started.isoformat()))
             if result.rowcount:
                 for image in images:
                     url = image.get("url_fullxfull") or image.get("url_570xN")
