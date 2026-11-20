@@ -120,6 +120,14 @@ class HealthVaultTests(unittest.TestCase):
             health_vault.encrypted_backup(Path(self.tmp.name) / "legacy.enc", legacy)
         self.assertFalse((Path(self.tmp.name) / "legacy.enc").exists())
 
+    def test_failed_provision_removes_incomplete_database(self):
+        failed = Path(self.tmp.name) / "failed-vault.db"
+        with patch.object(health_vault.sqlite3, "connect", side_effect=sqlite3.OperationalError("simulated disk error")):
+            with self.assertRaises(sqlite3.OperationalError):
+                health_vault.provision(failed)
+        self.assertFalse(failed.exists())
+        self.assertEqual(health_vault.get("2026-11-20", "Anxiety", self.db), None)
+
     def test_missing_key_fails_closed(self):
         with patch.dict(os.environ, {"HEALTH_VAULT_KEY": ""}):
             with self.assertRaises(RuntimeError):
