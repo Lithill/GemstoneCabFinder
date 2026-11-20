@@ -72,6 +72,32 @@ class HealthVaultTests(unittest.TestCase):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
 
+    def test_failed_backup_write_removes_incomplete_destination(self):
+        health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+        backup = Path(self.tmp.name) / "failed-backup.enc"
+        real_fdopen = os.fdopen
+
+        class BrokenWriter:
+            def __init__(self, stream):
+                self.stream = stream
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return self.stream.__exit__(exc_type, exc, tb)
+
+            def write(self, data):
+                self.stream.write(data[:16])
+                raise OSError("simulated backup disk full")
+
+        with patch.object(health_vault.os, "fdopen",
+                          side_effect=lambda fd, mode: BrokenWriter(real_fdopen(fd, mode))):
+            with self.assertRaisesRegex(OSError, "simulated backup disk full"):
+                health_vault.encrypted_backup(backup, self.db)
+        self.assertFalse(backup.exists())
+        self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
+
     def test_failed_restore_write_removes_incomplete_destination(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         backup = Path(self.tmp.name) / "backup.enc"
