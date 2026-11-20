@@ -53,6 +53,27 @@ class HealthVaultTests(unittest.TestCase):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
 
+    def test_corrupted_backup_cannot_create_restored_database(self):
+        health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+        backup = Path(self.tmp.name) / "backup.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        corrupted = bytearray(backup.read_bytes())
+        corrupted[len(corrupted) // 2] ^= 1
+        backup.write_bytes(corrupted)
+        restored = Path(self.tmp.name) / "corrupt-restored.db"
+        with self.assertRaises(InvalidToken):
+            health_vault.restore_backup(backup, restored)
+        self.assertFalse(restored.exists())
+        self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
+
+    def test_backup_refuses_overwrite(self):
+        backup = Path(self.tmp.name) / "backup.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        original = backup.read_bytes()
+        with self.assertRaises(FileExistsError):
+            health_vault.encrypted_backup(backup, self.db)
+        self.assertEqual(backup.read_bytes(), original)
+
     def test_legacy_plaintext_metadata_schema_is_rejected(self):
         legacy = Path(self.tmp.name) / "legacy.db"
         with sqlite3.connect(legacy) as conn:
