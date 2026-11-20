@@ -56,6 +56,7 @@ class HealthVaultTests(unittest.TestCase):
         encoded = health_vault.password_hash("a long unique passphrase")
         self.assertTrue(health_vault.verify_password("a long unique passphrase", encoded))
         self.assertFalse(health_vault.verify_password("wrong password", encoded))
+        self.assertFalse(health_vault.verify_password("anything", "scrypt$32768$8$1$%%%$%%%"))
         with self.assertRaises(ValueError):
             health_vault.password_hash("short")
 
