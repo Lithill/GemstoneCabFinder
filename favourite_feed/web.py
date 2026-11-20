@@ -191,6 +191,22 @@ def feed_breakdown(rows, filters, refresh_status):
     return {"overall": overall, "run": run}
 
 
+@app.get("/dashboard")
+def dashboard():
+    """App launcher; existing / remains the gemstone feed."""
+    with connect_database() as conn:
+        filters = preferences(conn)
+        rows = conn.execute("SELECT title, seen_at FROM listings").fetchall()
+        active_shops = conn.execute(
+            "SELECT COUNT(*) FROM monitored_shops WHERE is_active=1"
+        ).fetchone()[0]
+        liked = conn.execute("SELECT COUNT(*) FROM listings WHERE liked=1").fetchone()[0]
+    counts = feed_breakdown(rows, filters, refresh_jobs.snapshot())["overall"]
+    return render_template("dashboard.html", counts=counts,
+                           active_shops=active_shops, liked=liked,
+                           refresh_status=refresh_jobs.snapshot())
+
+
 @app.get("/")
 def index():
     mode = request.args.get("mode", "unseen")
