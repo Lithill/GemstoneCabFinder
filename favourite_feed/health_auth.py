@@ -14,7 +14,7 @@ from functools import wraps
 
 from flask import Blueprint, abort, make_response, redirect, render_template_string, request, url_for
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from favourite_feed.health_vault import verify_password
+from favourite_feed.health_vault import verify_password, _key
 
 health_auth = Blueprint("health_auth", __name__, url_prefix="/health-auth")
 COOKIE = "__Host-health_session"
@@ -48,7 +48,15 @@ def _signer(salt):
 
 
 def credentials_ready():
-    return bool(os.environ.get("HEALTH_PASSWORD_HASH") and os.environ.get("HEALTH_VAULT_KEY") and os.environ.get("HEALTH_SESSION_SECRET"))
+    """Fail closed when secrets are missing, malformed, or too short."""
+    if not os.environ.get("HEALTH_PASSWORD_HASH"):
+        return False
+    try:
+        _secret()
+        _key()
+    except (RuntimeError, UnicodeError):
+        return False
+    return True
 
 
 def check_password(candidate):
