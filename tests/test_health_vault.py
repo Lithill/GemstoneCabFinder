@@ -66,6 +66,23 @@ class HealthVaultTests(unittest.TestCase):
         self.assertFalse(restored.exists())
         self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
 
+    @unittest.skipIf(os.name == "nt", "POSIX permission checks only")
+    def test_vault_and_restored_backup_permissions(self):
+        self.assertEqual(self.db.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.db.parent.stat().st_mode & 0o777, 0o700)
+        backup_dir = Path(self.tmp.name) / "backups"
+        backup_dir.mkdir(mode=0o755)
+        backup = backup_dir / "health.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(backup_dir.stat().st_mode & 0o777, 0o700)
+        restore_dir = Path(self.tmp.name) / "restored"
+        restore_dir.mkdir(mode=0o755)
+        restored = restore_dir / "vault.db"
+        health_vault.restore_backup(backup, restored)
+        self.assertEqual(restored.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(restore_dir.stat().st_mode & 0o777, 0o700)
+
     def test_backup_refuses_overwrite(self):
         backup = Path(self.tmp.name) / "backup.enc"
         health_vault.encrypted_backup(backup, self.db)
