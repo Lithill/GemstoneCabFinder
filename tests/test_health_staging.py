@@ -62,6 +62,9 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         tracker = self.client.get("/private-symptom-tracker")
         self.assertEqual(tracker.status_code, 200)
         self.assertIn(b"symptom", tracker.data.lower())
+        self.assertIn(b"Private tracker account / Sign out", tracker.data)
+        self.assertIn(b"/health-auth/", tracker.data)
+        self.assertNotIn(b'href="/dashboard"', tracker.data)
         self.assertEqual(tracker.headers["Cache-Control"], "no-store")
         self.assertIn("form-action 'none'", tracker.headers["Content-Security-Policy"])
         session = self.client.get_cookie(health_auth.COOKIE).value
