@@ -5,10 +5,10 @@ const groups = [
     ["Hot flushes","yesno"],["Night sweats","yesno"]
   ]},
   {name:"Periods and bleeding",items:[
-    ["Period / bleeding today","period"],["Period start or end date","date"],["Cycle changes or irregular periods","severity"],["Abnormal vaginal bleeding","severity"],["Heavy bleeding or flooding","severity"]
+    ["Period / bleeding today","period"],["Period start or end date","date"],["Cycle changes or irregular periods","severity"],["Heavy bleeding or flooding","severity"]
   ]},
   {name:"Mood and emotions",items:[
-    ["Anhedonia (loss of enjoyment)","severity"],["Anxiety / feeling tense or nervous","severity"],["Change to your mood / mood swings","severity"],["Crying spells","severity"],["Depression / low mood","severity"],["Irritability","severity"],["Lack of motivation","severity"],["Loss of confidence","severity"],["Panic attacks","severity"],["Anger or angry outbursts","severity"]
+    ["Anhedonia (loss of enjoyment)","severity"],["Anxiety / feeling tense or nervous","severity"],["Change to your mood / mood swings","severity"],["Crying spells","severity"],["Depression / low mood","severity"],["Irritability","severity"],["Lack of motivation","severity"],["Shutdowns","severity"],["Meltdowns","severity"],["Panic attacks","severity"],["Anger or angry outbursts","severity"]
   ]},
   {name:"Thinking, energy and sleep",items:[
     ["Brain fog","severity"],["Difficulty concentrating / loss of concentration","severity"],["Fatigue / lacking in energy","severity"],["Difficulty sleeping / insomnia","sleep"]
@@ -20,7 +20,7 @@ const groups = [
     ["UTI episode / recurrent UTIs","uti"],["Sex drive / low libido / fluctuations","libido"]
   ]},
   {name:"Weight",items:[
-    ["Weight measurement","weight"],["Weight gain","severity"]
+    ["Weight measurement","weight"]
   ]}
 ];
 const questions=groups.flatMap(g=>g.items.map(([name,type])=>({name,type,category:g.name})));
