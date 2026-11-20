@@ -165,8 +165,15 @@ def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(destination.parent, 0o700)
     fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "wb") as output:
-        output.write(encrypted)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            output.write(encrypted)
+            output.flush()
+            os.fsync(output.fileno())
+    except Exception:
+        # An interrupted backup must not masquerade as a recoverable snapshot.
+        destination.unlink(missing_ok=True)
+        raise
 
 
 def restore_backup(source: Path, destination: Path) -> None:
