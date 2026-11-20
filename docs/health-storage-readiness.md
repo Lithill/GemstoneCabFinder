@@ -50,3 +50,17 @@ installing the tested cryptography dependency, configuring the separate
 password hash, vault key and session secret outside GitHub, checking HTTPS
 proxy behaviour, and completing a deployment security review. The preview
 still has no health-data saving endpoint, even if the flag is enabled.
+
+## Offline deletion and retention
+
+The offline vault now supports `delete(day, question)` for a single encrypted
+entry, with regression tests for exact-match deletion and incorrect-key
+rejection. No deletion or saving endpoint is exposed to the browser.
+
+**Important:** deleting a SQLite row is *logical deletion*, not guaranteed
+secure erasure of every byte on disk. SQLite free pages, journal/WAL files,
+filesystem snapshots and previously created encrypted backups may still
+contain old ciphertext. A future live release needs a documented retention,
+backup expiration, deletion and account-erasure policy before accepting
+personal health information. Never claim that deleting a row erases every
+historical copy.
