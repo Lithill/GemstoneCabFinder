@@ -175,7 +175,7 @@ def index():
     listings = [r for r in rows if
                 (mode == "liked" and r["liked"]) or
                 (mode == "seen" and r["seen_at"]) or
-                (mode == "unseen" and not r["seen_at"] and is_visible(r["title"], **filters))]
+                (mode == "unseen" and not r["seen_at"] and is_visible(r["title"], exclusions=filters["exclusions"], preferences=filters["preferences"], preferred_only=filters["preferred_only"], show_excluded=filters["show_excluded"]))]
     if mode == "liked":
         listings.sort(key=lambda row: (row["seen_at"] or "", row["listing_id"]), reverse=True)
     if mode == "unseen" and request.args.get("view") == "swipe":
