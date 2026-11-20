@@ -32,6 +32,11 @@ class HealthVaultTests(unittest.TestCase):
         with health_vault._connect(self.db) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0], 2)
             self.assertNotIn(b"Severe", conn.execute("SELECT encrypted_payload FROM entries LIMIT 1").fetchone()[0])
+            self.assertEqual([column[1] for column in conn.execute("PRAGMA table_info(entries)")], ["entry_id", "encrypted_payload"])
+        raw = self.db.read_bytes()
+        self.assertNotIn(b"Anxiety", raw)
+        self.assertNotIn(b"2026-11-20", raw)
+        self.assertNotIn(b"Severe", raw)
 
     def test_backup_restore_and_wrong_key(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Moderate"}, self.db)
