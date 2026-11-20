@@ -7,6 +7,12 @@ DEFAULT_EXCLUSIONS = (
     "wire wrapped", "wholesale lot", "bead", "beads", "pcs",
     "pieces", "coffin", "faceted", "fordite", "surfite",
     "mohave", "rose cut",
+    # Finished jewellery; whole-word matching preserves terms such as "ring size".
+    "ring", "rings", "necklace", "necklaces", "earring", "earrings",
+    "bracelet", "bracelets", "pendant", "pendants", "choker", "chokers",
+    "bangle", "bangles", "brooch", "brooches", "anklet", "anklets",
+    "jewelry set", "jewellery set", "jewelry sets", "jewellery sets",
+    "cufflinks", "tie clip", "tie clips", "stud earrings",
 )
 DEFAULT_PREFERENCES = ("cabochon", "cab", "slab", "slice",
                        "cabochons", "cabs", "slabs", "slices")
