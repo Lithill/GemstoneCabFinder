@@ -33,6 +33,9 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         response = self.client.get("/private-symptom-tracker")
         self.assertEqual(response.status_code, 303)
         self.assertIn("/health-auth/login", response.headers["Location"])
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
+        self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
 
     def test_login_unlocks_tracker_and_logout_locks_it_again(self):
         login_page = self.client.get("/health-auth/login")
