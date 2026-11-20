@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Refresh shops</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head><body>
-<header><h1>Refresh shops</h1><a href="/">Back to feed</a></header>
+<header><a href="/dashboard">Dashboard</a><h1>Refresh shops</h1><a href="/">Back to feed</a></header>
 <main style="max-width:650px">
 {% if demo %}<p><strong>Demo:</strong> checks only the three sample shops.</p>{% endif %}
 <p>You can browse other pages while the refresh runs. Progress is saved in the database. If you close the browser or lock your phone, processing may pause; reopening the site resumes it.</p>
