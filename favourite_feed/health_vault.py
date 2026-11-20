@@ -186,5 +186,12 @@ def restore_backup(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(destination.parent, 0o700)
     fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "wb") as output:
-        output.write(raw)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            output.write(raw)
+            output.flush()
+            os.fsync(output.fileno())
+    except Exception:
+        # Never leave a truncated restore destination looking like a vault.
+        destination.unlink(missing_ok=True)
+        raise
