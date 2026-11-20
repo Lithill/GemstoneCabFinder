@@ -40,6 +40,20 @@ class HealthVaultTests(unittest.TestCase):
         self.assertNotIn(b"2026-11-20", raw)
         self.assertNotIn(b"Severe", raw)
 
+    def test_put_rejects_non_json_nan_and_oversized_answers(self):
+        invalid = [
+            {"answer": object()},
+            {"answer": float("nan")},
+            {"notes": "x" * (16 * 1024)},
+        ]
+        for answer in invalid:
+            with self.subTest(answer_type=type(answer.get("answer")).__name__):
+                with self.assertRaises(ValueError):
+                    health_vault.put("2026-11-20", "Sleep", answer, self.db)
+        self.assertIsNone(health_vault.get("2026-11-20", "Sleep", self.db))
+        health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+        self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
+
     def test_delete_only_targeted_day_and_question(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         health_vault.put("2026-11-20", "Anxiety", {"answer": "Severe"}, self.db)
