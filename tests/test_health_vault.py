@@ -83,6 +83,23 @@ class HealthVaultTests(unittest.TestCase):
         self.assertEqual(restored.stat().st_mode & 0o777, 0o600)
         self.assertEqual(restore_dir.stat().st_mode & 0o777, 0o700)
 
+    @unittest.skipIf(os.name == "nt", "Symlink test requires POSIX support")
+    def test_symlink_paths_are_rejected(self):
+        linked_vault = Path(self.tmp.name) / "linked-vault.db"
+        linked_vault.symlink_to(self.db)
+        with self.assertRaisesRegex(RuntimeError, "symlink"):
+            health_vault.get("2026-11-20", "Sleep", linked_vault)
+        with self.assertRaises(FileExistsError):
+            health_vault.provision(linked_vault)
+        backup = Path(self.tmp.name) / "backup.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        linked_backup = Path(self.tmp.name) / "linked-backup.enc"
+        linked_backup.symlink_to(backup)
+        with self.assertRaisesRegex(RuntimeError, "symlink"):
+            health_vault.restore_backup(linked_backup, Path(self.tmp.name) / "new.db")
+        with self.assertRaises(FileExistsError):
+            health_vault.encrypted_backup(linked_backup, self.db)
+
     def test_backup_refuses_overwrite(self):
         backup = Path(self.tmp.name) / "backup.enc"
         health_vault.encrypted_backup(backup, self.db)
