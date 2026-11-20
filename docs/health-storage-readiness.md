@@ -35,3 +35,18 @@ The development branch includes `tests/test_health_auth.py`, `tests/test_health_
 ## Vault schema privacy revision
 
 The offline vault now stores only a keyed HMAC entry identifier and Fernet-encrypted JSON containing date, symptom name, and answer. This prevents readable symptom names and dates in the SQLite file. The revision changes the schema and is **not compatible with previously provisioned prototype health vault files**. No live health-data collection has been enabled. Do not attempt to overwrite any existing vault; if a test vault already exists, preserve it and plan an explicit offline migration before use. Test the new schema and backup/restore before any activation.
+
+## Disabled-by-default private tracker preview
+
+The existing public `/symptom-tracker` remains a temporary, non-saving
+prototype. The Flask application now registers `/health-auth/*` and
+`/private-symptom-tracker` **only** when
+`HEALTH_TRACKER_PREVIEW_ENABLED=1` is explicitly set. By default, these
+routes are absent and the health cryptography module is not imported by
+`web.py`, preserving the existing live installation.
+
+Do **not** set this flag on PythonAnywhere yet. Enabling the preview requires
+installing the tested cryptography dependency, configuring the separate
+password hash, vault key and session secret outside GitHub, checking HTTPS
+proxy behaviour, and completing a deployment security review. The preview
+still has no health-data saving endpoint, even if the flag is enabled.
