@@ -64,3 +64,24 @@ contain old ciphertext. A future live release needs a documented retention,
 backup expiration, deletion and account-erasure policy before accepting
 personal health information. Never claim that deleting a row erases every
 historical copy.
+
+## Offline recovery drill
+
+The automated vault tests exercise a complete backup, authentication and
+integrity verification, restore to a **new** database, and independent reading
+of multiple encrypted answers. They also check that deleting an entry from
+the restored copy does not alter the original vault or its encrypted backup.
+
+For an offline manual check, with `HEALTH_VAULT_KEY` configured outside Git:
+
+```sh
+python scripts/health_vault_admin.py backup /private/path/backup.enc
+python scripts/health_vault_admin.py verify-backup /private/path/backup.enc
+python scripts/health_vault_admin.py restore /private/path/backup.enc /private/path/restored.db
+```
+
+Use new paths, never overwrite the production gemstone database or an
+existing health vault. These commands do not activate web collection.
+A passing automated recovery drill is not a substitute for testing a real
+deployment's backup permissions, off-host backup custody, and restoration
+procedure before enabling health-data storage.
