@@ -25,6 +25,43 @@ class HealthVaultTests(unittest.TestCase):
         self.db = Path(self.tmp.name) / "vault.db"
         health_vault.provision(self.db)
 
+    def test_vault_operations_close_sqlite_connections(self):
+        original_connect = health_vault._connect
+        opened = []
+
+        class TrackedConnection:
+            def __init__(self, connection):
+                self.connection = connection
+                self.closed = False
+
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+
+            def __enter__(self):
+                self.connection.__enter__()
+                return self
+
+            def __exit__(self, *args):
+                return self.connection.__exit__(*args)
+
+            def close(self):
+                self.closed = True
+                self.connection.close()
+
+        def tracked_connect(path):
+            tracked = TrackedConnection(original_connect(path))
+            opened.append(tracked)
+            return tracked
+
+        with patch.object(health_vault, "_connect", side_effect=tracked_connect):
+            health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+            self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
+            backup = Path(self.tmp.name) / "closed-connections.enc"
+            health_vault.encrypted_backup(backup, self.db)
+            self.assertTrue(health_vault.delete("2026-11-20", "Sleep", self.db))
+        self.assertEqual(len(opened), 4)
+        self.assertTrue(all(connection.closed for connection in opened))
+
     def test_upsert_replaces_same_day_question_only(self):
         health_vault.put("2026-11-20", "Anxiety", {"answer": "Mild"}, self.db)
         health_vault.put("2026-11-20", "Anxiety", {"answer": "Severe"}, self.db)
