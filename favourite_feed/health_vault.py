@@ -195,7 +195,12 @@ def _verify_encrypted_entries(conn) -> int:
         "SELECT entry_id, encrypted_payload FROM entries"
     ):
         try:
-            record = json.loads(cipher.decrypt(encrypted_payload))
+            plaintext = cipher.decrypt(encrypted_payload)
+            if len(plaintext) > 16 * 1024:
+                raise RuntimeError("Encrypted health entry exceeds size limit.")
+            def reject_nonfinite(value):
+                raise ValueError("Non-finite JSON number is not allowed.")
+            record = json.loads(plaintext, parse_constant=reject_nonfinite)
             day, question, answer = record["day"], record["question"], record["answer"]
             from datetime import date
             if (not isinstance(day, str) or not isinstance(question, str)
