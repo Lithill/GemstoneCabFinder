@@ -53,6 +53,8 @@ def _connect(path: Path):
     path = Path(path).expanduser()
     if not path.exists():
         raise FileNotFoundError("Health vault not provisioned.")
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError("Health vault path must be a regular file, not a symlink.")
     return sqlite3.connect(path)
 
 
@@ -62,7 +64,7 @@ def provision(path: Path = DEFAULT_PATH) -> None:
     path = Path(path).expanduser()
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(path.parent, 0o700)
-    if path.exists():
+    if path.exists() or path.is_symlink():
         raise FileExistsError("Refusing to overwrite existing health vault.")
     # Reserve the file atomically with private permissions before SQLite writes.
     fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -132,7 +134,7 @@ def get(day: str, question: str, path: Path = DEFAULT_PATH) -> dict | None:
 def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
     """Produce a separately encrypted, portable SQLite snapshot; never plaintext backup."""
     destination = Path(destination).expanduser()
-    if destination.exists():
+    if destination.exists() or destination.is_symlink():
         raise FileExistsError("Refusing to overwrite backup.")
     with _connect(path) as source:
         _verified(source)
@@ -153,6 +155,8 @@ def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
 def restore_backup(source: Path, destination: Path) -> None:
     """Offline restore to a NEW file only. Verify backup and key before writing."""
     source, destination = Path(source).expanduser(), Path(destination).expanduser()
+    if source.is_symlink() or not source.is_file():
+        raise RuntimeError("Backup source must be a regular file, not a symlink.")
     raw = Fernet(_key()).decrypt(source.read_bytes())
     check = sqlite3.connect(":memory:")
     try:
