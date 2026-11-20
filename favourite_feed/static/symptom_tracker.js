@@ -77,9 +77,6 @@ function fields(parent,q){
   }else{
     inputs.answer=field(parent,"Severity",null,[["","Not recorded"],["None","None"],["Mild","Mild"],["Moderate","Moderate"],["Severe","Severe"]]);
   }
-  if(q.type!=="yesno"&&q.type!=="date"&&q.type!=="weight"){
-    inputs.time=field(parent,"Time of day",null,[["","Any time"],["Morning","Morning"],["Afternoon","Afternoon"],["Evening","Evening"],["Night","Night"]]);
-  }
   inputs.notes=field(parent,"Optional notes (not saved)","text");
   return inputs;
 }
