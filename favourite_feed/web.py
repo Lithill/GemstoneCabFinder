@@ -160,6 +160,37 @@ def refresh_one(shop_id):
     finally:
         refresh_lock.release()
 
+def feed_breakdown(rows, filters, refresh_status):
+    """Disjoint inventory counts, plus counts for the latest tracked refresh."""
+    def visible(row):
+        return is_visible(row["title"],
+                          exclusions=filters["exclusions"],
+                          preferences=filters["preferences"],
+                          preferred_only=filters["preferred_only"],
+                          show_excluded=filters["show_excluded"])
+
+    def tally(items):
+        counts = {"collected": len(items), "unseen": 0, "filtered": 0, "seen": 0}
+        for row in items:
+            if row["seen_at"]:
+                counts["seen"] += 1
+            elif not visible(row):
+                counts["filtered"] += 1
+            else:
+                counts["unseen"] += 1
+        return counts
+
+    overall = tally(rows)
+    run = None
+    if refresh_status.get("started_at"):
+        start = refresh_status["started_at"]
+        end = refresh_status.get("finished_at")
+        run_rows = [row for row in rows if row["discovered_at"] >= start
+                    and (not end or row["discovered_at"] <= end)]
+        run = tally(run_rows)
+    return {"overall": overall, "run": run}
+
+
 @app.get("/")
 def index():
     mode = request.args.get("mode", "unseen")
@@ -172,6 +203,7 @@ def index():
             FROM listings l JOIN monitored_shops s USING(shop_id)
             ORDER BY published_at DESC, listing_id DESC
         """).fetchall()
+    breakdown = feed_breakdown(rows, filters, refresh_jobs.snapshot())
     listings = [r for r in rows if
                 (mode == "liked" and r["liked"]) or
                 (mode == "seen" and r["seen_at"]) or
@@ -179,8 +211,8 @@ def index():
     if mode == "liked":
         listings.sort(key=lambda row: (row["seen_at"] or "", row["listing_id"]), reverse=True)
     if mode == "unseen" and request.args.get("view") == "swipe":
-        return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings), refresh_status=refresh_jobs.snapshot())
-    return render_template("feed.html", listings=listings, mode=mode, refresh_status=refresh_jobs.snapshot())
+        return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings), refresh_status=refresh_jobs.snapshot(), breakdown=breakdown)
+    return render_template("feed.html", listings=listings, mode=mode, refresh_status=refresh_jobs.snapshot(), breakdown=breakdown)
 
 
 @app.post("/etsy/<int:listing_id>")
