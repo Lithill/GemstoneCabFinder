@@ -3,7 +3,7 @@
 <title>Perimenopause tracker · Design preview</title>
 <link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
 <link rel="stylesheet" href="{{ url_for('static',filename='symptom_tracker.css') }}"></head>
-<body><header><h1>Perimenopause tracker</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a></nav></header>
+<body><header><h1>Perimenopause tracker</h1><nav>{% if private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 <div class="tracker-warning"><strong>Design preview only — nothing is saved.</strong> Answers stay on this page temporarily. Leaving or refreshing clears them. Do not enter identifying or sensitive notes during testing.</div>
 <h2>How would you like to check in?</h2>
