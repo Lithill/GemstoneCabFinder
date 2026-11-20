@@ -197,7 +197,7 @@ def _verify_encrypted_entries(conn) -> int:
         try:
             plaintext = cipher.decrypt(encrypted_payload)
             if len(plaintext) > 16 * 1024:
-                raise RuntimeError("Encrypted health entry exceeds size limit.")
+                raise ValueError("Encrypted health entry exceeds size limit.")
             def reject_nonfinite(value):
                 raise ValueError("Non-finite JSON number is not allowed.")
             record = json.loads(plaintext, parse_constant=reject_nonfinite)
