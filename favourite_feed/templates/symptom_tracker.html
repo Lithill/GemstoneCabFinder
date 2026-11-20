@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Perimenopause tracker · Design preview</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='symptom_tracker.css') }}"></head>
+<body><header><h1>Perimenopause tracker</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a></nav></header>
+<main class="tracker">
+<div class="tracker-warning"><strong>Design preview only — nothing is saved.</strong> Answers stay on this page temporarily. Leaving or refreshing clears them. Do not enter identifying or sensitive notes during testing.</div>
+<h2>How would you like to check in?</h2>
+<div class="tracker-choices">
+<button type="button" id="guided-start" class="tracker-choice"><strong>Guided check-in</strong><span>Go through every question, one by one. Skip any question.</span></button>
+<button type="button" id="quick-start" class="tracker-choice"><strong>Quick entry</strong><span>Choose a symptom or measurement to record right now.</span></button>
+</div>
+<section id="guided" hidden aria-label="Guided check-in">
+<div class="tracker-toolbar"><button type="button" id="guided-exit">← Choose a mode</button><span id="guided-progress" aria-live="polite"></span></div>
+<progress id="guided-bar" value="0" max="1"></progress>
+<h2 id="guided-question"></h2><p id="guided-help"></p>
+<div id="guided-fields"></div>
+<div class="tracker-actions"><button type="button" id="guided-back">Back</button><button type="button" id="guided-skip">Skip</button><button type="button" id="guided-next" class="tracker-primary">Next</button></div>
+</section>
+<section id="quick" hidden aria-label="Quick symptom entry">
+<div class="tracker-toolbar"><button type="button" id="quick-exit">← Choose a mode</button></div>
+<h2>Add an entry</h2>
+<label for="quick-category">Category</label><select id="quick-category"></select>
+<label for="quick-symptom">Symptom or measurement</label><select id="quick-symptom"></select>
+<div id="quick-fields"></div>
+<button type="button" id="quick-add" class="tracker-primary">Add to preview diary</button>
+</section>
+<section id="summary" class="tracker-summary" aria-live="polite">
+<h2>Preview diary <small id="entry-count">0 entries</small></h2>
+<p id="empty-diary">Your temporary entries will appear here. No data is stored.</p>
+<div id="diary-items"></div>
+<button type="button" id="clear-diary">Clear preview entries</button>
+</section>
+<p class="tracker-footnote">This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.</p>
+</main>
+<script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
+</body></html>
