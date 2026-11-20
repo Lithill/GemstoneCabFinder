@@ -15,7 +15,7 @@ def register_private_preview(app):
     @app.get("/private-symptom-tracker")
     @require_health_login
     def private_symptom_tracker():
-        response = make_response(render_template("symptom_tracker.html"))
+        response = make_response(render_template("symptom_tracker.html", private_preview=True))
         response.headers["Cache-Control"] = "no-store"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self'; "
