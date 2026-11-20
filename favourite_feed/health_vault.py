@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 import secrets
 import sqlite3
-from datetime import datetime, timezone
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -65,6 +64,9 @@ def provision(path: Path = DEFAULT_PATH) -> None:
     os.chmod(path.parent, 0o700)
     if path.exists():
         raise FileExistsError("Refusing to overwrite existing health vault.")
+    # Reserve the file atomically with private permissions before SQLite writes.
+    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(fd)
     connection = sqlite3.connect(path)
     try:
         connection.execute("""CREATE TABLE entries (
@@ -76,7 +78,6 @@ def provision(path: Path = DEFAULT_PATH) -> None:
         connection.commit()
     finally:
         connection.close()
-    os.chmod(path, 0o600)
 
 
 def _verified(conn):
@@ -162,6 +163,7 @@ def restore_backup(source: Path, destination: Path) -> None:
     finally:
         check.close()
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(destination.parent, 0o700)
     fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "wb") as output:
         output.write(raw)
