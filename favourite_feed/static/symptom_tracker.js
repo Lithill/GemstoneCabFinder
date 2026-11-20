@@ -36,15 +36,21 @@ function el(tag,attrs={},parent){
 function field(parent,label,type,options){
   const wrap=el("div",{className:"tracker-field"},parent);
   const id="field-"+parent.id+"-"+parent.children.length;
-  el("label",{for:id,text:label},wrap);
-  let input;
   if(options){
-    input=el("select",{id},wrap);
-    options.forEach(([value,text])=>{const opt=el("option",{value,text},input);});
-  }else{
-    input=el("input",{id,type:type||"text"},wrap);
-    if(type==="number"){input.min="0";input.step="any";}
+    const group=el("fieldset",{className:"tracker-radio-group"},wrap);
+    el("legend",{text:label},group);
+    const inputs=options.map(([value,text],i)=>{
+      const item=el("label",{className:"tracker-radio-option"},group);
+      const radio=el("input",{type:"radio",name:id,value},item);
+      if(i===0)radio.checked=true;
+      el("span",{text},item);
+      return radio;
+    });
+    return {get value(){return (inputs.find(r=>r.checked)||inputs[0]).value;}};
   }
+  el("label",{for:id,text:label},wrap);
+  const input=el("input",{id,type:type||"text"},wrap);
+  if(type==="number"){input.min="0";input.step="any";}
   return input;
 }
 function fields(parent,q){
