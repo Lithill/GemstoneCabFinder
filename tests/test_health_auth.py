@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from flask import Flask
+from cryptography.fernet import Fernet
 from favourite_feed import health_auth
 from favourite_feed.health_vault import password_hash
 
@@ -22,7 +23,7 @@ class HealthLoginTests(unittest.TestCase):
         cls.limits.start()
         cls.env = patch.dict(os.environ, {
             "HEALTH_SESSION_SECRET": "a" * 64,
-            "HEALTH_VAULT_KEY": "staged-placeholder-not-used-for-login",
+            "HEALTH_VAULT_KEY": Fernet.generate_key().decode(),
             "HEALTH_PASSWORD_HASH": password_hash("a strong test password 123"),
         })
         cls.env.start()
@@ -93,6 +94,14 @@ class HealthLoginTests(unittest.TestCase):
 
     def test_missing_configuration_refuses_login(self):
         with patch.dict(os.environ, {"HEALTH_PASSWORD_HASH": ""}):
+            self.assertEqual(self.client.get("/health-auth/login").status_code, 503)
+
+    def test_invalid_encryption_key_refuses_login(self):
+        with patch.dict(os.environ, {"HEALTH_VAULT_KEY": "invalid-key"}):
+            self.assertEqual(self.client.get("/health-auth/login").status_code, 503)
+
+    def test_short_session_secret_refuses_login(self):
+        with patch.dict(os.environ, {"HEALTH_SESSION_SECRET": "too-short"}):
             self.assertEqual(self.client.get("/health-auth/login").status_code, 503)
 
     def test_session_is_http_only_secure_and_same_site_strict(self):
