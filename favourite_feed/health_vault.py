@@ -115,7 +115,16 @@ def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> Non
         raise ValueError("Invalid date or question.")
     if not isinstance(answer, dict):
         raise ValueError("Answer must be an object.")
-    payload = Fernet(_key()).encrypt(json.dumps({"day": day, "question": question, "answer": answer}, ensure_ascii=False).encode("utf-8"))
+    try:
+        serialized = json.dumps(
+            {"day": day, "question": question, "answer": answer},
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise ValueError("Answer must contain valid JSON data.") from exc
+    if len(serialized) > 16 * 1024:
+        raise ValueError("Health entry exceeds the 16 KiB size limit.")
+    payload = Fernet(_key()).encrypt(serialized)
     with _connect(path) as conn:
         _verified(conn)
         conn.execute("""INSERT INTO entries (entry_id, encrypted_payload)
