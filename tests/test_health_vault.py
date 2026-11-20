@@ -72,6 +72,30 @@ class HealthVaultTests(unittest.TestCase):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
 
+    def test_backup_with_tampered_encrypted_entry_is_rejected(self):
+        health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+        # Change an encrypted record while keeping the SQLite file structurally valid.
+        with sqlite3.connect(self.db) as conn:
+            conn.execute("UPDATE entries SET encrypted_payload=?",
+                         (b"not-a-valid-fernet-token",))
+        backup = Path(self.tmp.name) / "tampered-entry.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        restored = Path(self.tmp.name) / "tampered-restored.db"
+        with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
+            health_vault.verify_backup(backup)
+        with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
+            health_vault.restore_backup(backup, restored)
+        self.assertFalse(restored.exists())
+
+    def test_backup_with_mismatched_secret_entry_id_is_rejected(self):
+        health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+        with sqlite3.connect(self.db) as conn:
+            conn.execute("UPDATE entries SET entry_id=?", ("0" * 64,))
+        backup = Path(self.tmp.name) / "mismatched-entry.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+            health_vault.verify_backup(backup)
+
     def test_recovery_drill_restores_multiple_entries_without_touching_original(self):
         """Exercise the full backup/verify/restore/read workflow offline."""
         original = {
