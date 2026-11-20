@@ -178,6 +178,10 @@ def login():
         response.headers["Retry-After"] = str(LOCK_SECONDS)
         return _cookie(response)
     password = request.form.get("password", "")
+    # Bound scrypt work and memory consumption for untrusted form submissions.
+    # Valid passwords are limited to 1024 UTF-8 bytes.
+    if len(password.encode("utf-8")) > 1024:
+        abort(413)
     if not check_password(password):
         _failure(identity, now)
         return _cookie(make_response(render_template_string(LOGIN_HTML, csrf=supplied, error=True), 401))
