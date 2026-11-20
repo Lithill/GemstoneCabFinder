@@ -87,6 +87,27 @@ class HealthVaultTests(unittest.TestCase):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
 
+    def test_backup_rejects_authenticated_oversized_or_nan_entry(self):
+        day, question = "2026-11-20", "Sleep"
+        for raw_answer in ['{"notes":"' + "x" * (16 * 1024) + '"}', '{"value":NaN}']:
+            with self.subTest(answer_size=len(raw_answer)):
+                plaintext = (
+                    '{"day":"2026-11-20","question":"Sleep","answer":'
+                    + raw_answer + "}"
+                ).encode()
+                payload = Fernet(self.key.encode()).encrypt(plaintext)
+                with sqlite3.connect(self.db) as conn:
+                    conn.execute("INSERT OR REPLACE INTO entries VALUES (?, ?)",
+                                 (health_vault._entry_id(day, question), payload))
+                backup = Path(self.tmp.name) / ("oversized.enc" if len(raw_answer) > 1000 else "nan.enc")
+                health_vault.encrypted_backup(backup, self.db)
+                restored = Path(self.tmp.name) / ("oversized.db" if len(raw_answer) > 1000 else "nan.db")
+                with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
+                    health_vault.verify_backup(backup)
+                with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
+                    health_vault.restore_backup(backup, restored)
+                self.assertFalse(restored.exists())
+
     def test_backup_rejects_authenticated_but_invalid_entry_date(self):
         # Even valid Fernet ciphertext and matching HMAC IDs must not bypass
         # the data validation normally applied by put().
