@@ -124,6 +124,9 @@ def _revoke(nonce):
 
 
 def _valid_session():
+    # Configuration removal or corruption must invalidate existing sessions too.
+    if not credentials_ready():
+        return None
     token = request.cookies.get(COOKIE, "")
     if not token:
         return None
