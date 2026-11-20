@@ -201,6 +201,7 @@ def home():
     <title>Private tracker</title></head><body>
     <h1>Private tracker login verified</h1>
     <p>Health-data collection is not enabled.</p>
+    <p><a href="/private-symptom-tracker">Open private tracker preview</a></p>
     <form method="post" action="{{ url_for('health_auth.logout') }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button type="submit">Sign out</button></form></body></html>"""
