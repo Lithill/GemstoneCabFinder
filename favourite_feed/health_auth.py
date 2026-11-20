@@ -67,6 +67,7 @@ def _rate_connection():
     os.chmod(RATE_DB.parent, 0o700)
     conn = sqlite3.connect(RATE_DB, timeout=10)
     conn.execute("CREATE TABLE IF NOT EXISTS attempts (identity TEXT PRIMARY KEY, failures INTEGER NOT NULL, locked_until INTEGER NOT NULL)")
+    conn.execute("CREATE TABLE IF NOT EXISTS revoked_sessions (nonce_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
     os.chmod(RATE_DB, 0o600)
     return conn
 
@@ -104,14 +105,27 @@ def _cookie(response, token=None):
     return response
 
 
+def _nonce_hash(nonce):
+    return hmac.new(_secret().encode(), nonce.encode(), hashlib.sha256).hexdigest()
+
+
+def _revoke(nonce):
+    with _rate_connection() as conn:
+        conn.execute("INSERT OR REPLACE INTO revoked_sessions VALUES (?, ?)", (_nonce_hash(nonce), int(time.time()) + SESSION_IDLE_SECONDS))
+        conn.execute("DELETE FROM revoked_sessions WHERE expires_at < ?", (int(time.time()),))
+
+
 def _valid_session():
     token = request.cookies.get(COOKIE, "")
     if not token:
         return None
     try:
         data = _signer("health-session-v1").loads(token, max_age=SESSION_IDLE_SECONDS)
-        if data.get("auth") is True and isinstance(data.get("csrf"), str):
-            return data
+        if data.get("auth") is True and isinstance(data.get("csrf"), str) and isinstance(data.get("nonce"), str):
+            with _rate_connection() as conn:
+                revoked = conn.execute("SELECT 1 FROM revoked_sessions WHERE nonce_hash=?", (_nonce_hash(data["nonce"]),)).fetchone()
+            if not revoked:
+                return data
     except (BadSignature, SignatureExpired, ValueError, TypeError):
         pass
     return None
@@ -157,7 +171,7 @@ def login():
         _failure(identity, now)
         return _cookie(make_response(render_template_string(LOGIN_HTML, csrf=supplied, error=True), 401))
     _clear_failures(identity)
-    token = _signer("health-session-v1").dumps({"auth": True, "csrf": secrets.token_urlsafe(32)})
+    token = _signer("health-session-v1").dumps({"auth": True, "csrf": secrets.token_urlsafe(32), "nonce": secrets.token_urlsafe(32)})
     response = make_response(redirect(url_for("health_auth.home"), code=303))
     response.delete_cookie("__Host-health_login_csrf", secure=True, httponly=True, samesite="Strict", path="/")
     return _cookie(response, token)
@@ -166,7 +180,16 @@ def login():
 @health_auth.get("/")
 @require_health_login
 def home():
-    return _cookie(make_response("<h1>Private tracker login verified</h1><p>Health-data collection is not enabled.</p>"))
+    current = _valid_session()
+    html = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Private tracker</title></head><body>
+    <h1>Private tracker login verified</h1>
+    <p>Health-data collection is not enabled.</p>
+    <form method="post" action="{{ url_for('health_auth.logout') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit">Sign out</button></form></body></html>"""
+    return _cookie(make_response(render_template_string(html, csrf=current["csrf"])))
 
 
 @health_auth.post("/logout")
@@ -176,6 +199,7 @@ def logout():
     supplied = request.form.get("csrf", "")
     if not current or not hmac.compare_digest(supplied, current["csrf"]):
         abort(400)
+    _revoke(current["nonce"])
     return _cookie(make_response(redirect(url_for("health_auth.login"), code=303)))
 
 
