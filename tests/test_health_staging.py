@@ -52,6 +52,18 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.client.post("/health-auth/logout", data={"csrf": logout_csrf}).status_code, 303)
         self.assertEqual(self.client.get("/private-symptom-tracker").status_code, 303)
 
+    def test_existing_session_is_rejected_if_security_config_disappears(self):
+        self.client.get("/health-auth/login")
+        csrf = self.client.get_cookie("__Host-health_login_csrf").value
+        self.assertEqual(self.client.post("/health-auth/login", data={
+            "csrf": csrf, "password": "integration test passphrase"
+        }).status_code, 303)
+        self.assertEqual(self.client.get("/private-symptom-tracker").status_code, 200)
+        with patch.dict(os.environ, {"HEALTH_VAULT_KEY": "invalid-key"}):
+            self.assertEqual(self.client.get("/private-symptom-tracker").status_code, 303)
+        with patch.dict(os.environ, {"HEALTH_PASSWORD_HASH": ""}):
+            self.assertEqual(self.client.get("/private-symptom-tracker").status_code, 303)
+
     def test_missing_credentials_cannot_view_tracker(self):
         with patch.dict(os.environ, {"HEALTH_PASSWORD_HASH": ""}):
             self.assertEqual(self.client.get("/private-symptom-tracker").status_code, 303)
