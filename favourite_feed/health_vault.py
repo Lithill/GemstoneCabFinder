@@ -231,6 +231,7 @@ def restore_backup(source: Path, destination: Path) -> None:
         _verified(check)
         if check.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise RuntimeError("Backup integrity check failed.")
+        _verify_encrypted_entries(check)
     finally:
         check.close()
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
