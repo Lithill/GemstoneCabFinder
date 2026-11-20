@@ -4,6 +4,7 @@ No Flask routes import this module. Nothing accepts or stores tracker answers ye
 Install cryptography before provisioning. Keep secrets outside source control.
 """
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -34,7 +35,7 @@ def verify_password(password: str, encoded: str) -> bool:
             return False
         digest = hashlib.scrypt(password.encode("utf-8"), salt=base64.urlsafe_b64decode(salt), n=32768, r=8, p=1, maxmem=64 * 1024 * 1024)
         return hmac.compare_digest(digest, base64.urlsafe_b64decode(expected))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, binascii.Error):
         return False
 
 
