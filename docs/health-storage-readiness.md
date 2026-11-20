@@ -31,3 +31,7 @@ before production use. Encrypted backups encrypt the complete snapshot.
 ## Automated offline checks
 
 The development branch includes `tests/test_health_auth.py`, `tests/test_health_vault.py`, and `.github/workflows/health-security-tests.yml`. The workflow runs on pushes to `feature/favourite-feed` using free GitHub-hosted runner capacity subject to the repository's Actions allowance. Check the actual workflow result before treating tests as passed; the presence of test code alone is not verification. The tests use only synthetic values and temporary databases, never production health data.
+
+## Vault schema privacy revision
+
+The offline vault now stores only a keyed HMAC entry identifier and Fernet-encrypted JSON containing date, symptom name, and answer. This prevents readable symptom names and dates in the SQLite file. The revision changes the schema and is **not compatible with previously provisioned prototype health vault files**. No live health-data collection has been enabled. Do not attempt to overwrite any existing vault; if a test vault already exists, preserve it and plan an explicit offline migration before use. Test the new schema and backup/restore before any activation.
