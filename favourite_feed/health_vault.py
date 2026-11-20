@@ -176,6 +176,28 @@ def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
         raise
 
 
+
+def verify_backup(source: Path) -> int:
+    """Offline-only: authenticate a backup, check SQLite integrity, count entries.
+
+    Returns the number of encrypted records. Never decrypts individual answers
+    or writes a restored database.
+    """
+    source = Path(source).expanduser()
+    if source.is_symlink() or not source.is_file():
+        raise RuntimeError("Backup source must be a regular file, not a symlink.")
+    raw = Fernet(_key()).decrypt(source.read_bytes())
+    check = sqlite3.connect(":memory:")
+    try:
+        check.deserialize(raw)
+        _verified(check)
+        if check.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise RuntimeError("Backup integrity check failed.")
+        return check.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+    finally:
+        check.close()
+
+
 def restore_backup(source: Path, destination: Path) -> None:
     """Offline restore to a NEW file only. Verify backup and key before writing."""
     source, destination = Path(source).expanduser(), Path(destination).expanduser()
