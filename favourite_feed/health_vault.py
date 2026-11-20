@@ -80,6 +80,11 @@ def provision(path: Path = DEFAULT_PATH) -> None:
 
 
 def _verified(conn):
+    # Reject legacy or damaged schemas before any reads, writes, or restores.
+    # In particular, legacy vaults had plaintext day/question columns.
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(entries)")]
+    if columns != ["entry_id", "encrypted_payload"]:
+        raise RuntimeError("Unsupported health vault schema; offline migration required.")
     row = conn.execute("SELECT value FROM vault_meta WHERE key='key_check'").fetchone()
     if not row:
         raise RuntimeError("Vault key check missing.")
