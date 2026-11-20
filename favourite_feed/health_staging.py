@@ -1,15 +1,15 @@
-"""Isolated login-to-tracker integration harness; never imported by live web.py.
+"""Opt-in private tracker preview registration and isolated test harness.
 
-This app is for automated security testing only. It never accepts or saves
-health answers. Do not expose it publicly or deploy it as the production WSGI app.
+No health answers are transmitted or saved. The production app imports this
+module only when HEALTH_TRACKER_PREVIEW_ENABLED=1 is explicitly configured.
 """
 from flask import Flask, make_response, render_template
 
 from favourite_feed.health_auth import health_auth, require_health_login
 
 
-def create_staging_app():
-    app = Flask(__name__)
+def register_private_preview(app):
+    """Add login and protected preview routes to a Flask app, without write APIs."""
     app.register_blueprint(health_auth)
 
     @app.get("/private-symptom-tracker")
@@ -24,4 +24,9 @@ def create_staging_app():
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
+
+def create_staging_app():
+    """Isolated Flask app for integration tests; not a production WSGI target."""
+    app = Flask(__name__)
+    register_private_preview(app)
     return app
