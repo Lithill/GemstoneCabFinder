@@ -196,7 +196,7 @@ def dashboard():
     """App launcher; existing / remains the gemstone feed."""
     with connect_database() as conn:
         filters = preferences(conn)
-        rows = conn.execute("SELECT title, seen_at FROM listings").fetchall()
+        rows = conn.execute("SELECT title, seen_at, discovered_at FROM listings").fetchall()
         active_shops = conn.execute(
             "SELECT COUNT(*) FROM monitored_shops WHERE is_active=1"
         ).fetchone()[0]
