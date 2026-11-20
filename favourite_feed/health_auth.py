@@ -12,7 +12,7 @@ import sqlite3
 import time
 from functools import wraps
 
-from flask import Blueprint, abort, make_response, redirect, render_template_string, request, url_for
+from flask import Blueprint, abort, current_app, make_response, redirect, render_template_string, request, url_for
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from favourite_feed.health_vault import verify_password, _key
 
@@ -201,11 +201,11 @@ def home():
     <title>Private tracker</title></head><body>
     <h1>Private tracker login verified</h1>
     <p>Health-data collection is not enabled.</p>
-    <p><a href="/private-symptom-tracker">Open private tracker preview</a></p>
+    {% if preview_enabled %}<p><a href="{{ url_for('private_symptom_tracker') }}">Open private tracker preview</a></p>{% endif %}
     <form method="post" action="{{ url_for('health_auth.logout') }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button type="submit">Sign out</button></form></body></html>"""
-    return _cookie(make_response(render_template_string(html, csrf=current["csrf"])))
+    return _cookie(make_response(render_template_string(html, csrf=current["csrf"], preview_enabled="private_symptom_tracker" in current_app.view_functions)))
 
 
 @health_auth.post("/logout")
