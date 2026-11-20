@@ -188,9 +188,12 @@ def _verify_encrypted_entries(conn) -> int:
         try:
             record = json.loads(cipher.decrypt(encrypted_payload))
             day, question, answer = record["day"], record["question"], record["answer"]
-            if not isinstance(day, str) or not isinstance(question, str) or not isinstance(answer, dict):
+            from datetime import date
+            if (not isinstance(day, str) or not isinstance(question, str)
+                    or not isinstance(answer, dict) or not question
+                    or len(question) > 200 or date.fromisoformat(day).isoformat() != day):
                 raise RuntimeError("Invalid encrypted health entry.")
-            if not hmac.compare_digest(entry_id, _entry_id(day, question)):
+            if not isinstance(entry_id, str) or not hmac.compare_digest(entry_id, _entry_id(day, question)):
                 raise RuntimeError("Encrypted health entry identity mismatch.")
         except (InvalidToken, ValueError, TypeError, KeyError) as exc:
             raise RuntimeError("Encrypted health entry verification failed.") from exc
