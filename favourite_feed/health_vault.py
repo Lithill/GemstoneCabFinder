@@ -23,7 +23,7 @@ def password_hash(password: str, *, salt: bytes | None = None) -> str:
     if len(password) < 16:
         raise ValueError("Health-tracker password must be at least 16 characters.")
     salt = salt or secrets.token_bytes(16)
-    digest = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**15, r=8, p=1)
+    digest = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**15, r=8, p=1, maxmem=64 * 1024 * 1024)
     return "scrypt$32768$8$1$" + base64.urlsafe_b64encode(salt).decode() + "$" + base64.urlsafe_b64encode(digest).decode()
 
 
@@ -32,7 +32,7 @@ def verify_password(password: str, encoded: str) -> bool:
         scheme, n, r, p, salt, expected = encoded.split("$")
         if scheme != "scrypt" or (n, r, p) != ("32768", "8", "1"):
             return False
-        digest = hashlib.scrypt(password.encode("utf-8"), salt=base64.urlsafe_b64decode(salt), n=32768, r=8, p=1)
+        digest = hashlib.scrypt(password.encode("utf-8"), salt=base64.urlsafe_b64decode(salt), n=32768, r=8, p=1, maxmem=64 * 1024 * 1024)
         return hmac.compare_digest(digest, base64.urlsafe_b64decode(expected))
     except (ValueError, TypeError):
         return False
