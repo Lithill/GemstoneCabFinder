@@ -72,6 +72,30 @@ class HealthVaultTests(unittest.TestCase):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
 
+    def test_verify_backup_authenticates_and_counts_encrypted_entries(self):
+        health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
+        health_vault.put("2026-11-21", "Sleep", {"answer": "Severe"}, self.db)
+        backup = Path(self.tmp.name) / "verified-backup.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        self.assertEqual(health_vault.verify_backup(backup), 2)
+        self.assertFalse((Path(self.tmp.name) / "verified-backup.db").exists())
+        with patch.dict(os.environ, {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
+            with self.assertRaises(InvalidToken):
+                health_vault.verify_backup(backup)
+        corrupted = bytearray(backup.read_bytes())
+        corrupted[-1] ^= 1
+        backup.write_bytes(corrupted)
+        with self.assertRaises(InvalidToken):
+            health_vault.verify_backup(backup)
+
+    def test_verify_backup_rejects_symlink(self):
+        backup = Path(self.tmp.name) / "verified-backup.enc"
+        health_vault.encrypted_backup(backup, self.db)
+        linked = Path(self.tmp.name) / "linked-verified-backup.enc"
+        linked.symlink_to(backup)
+        with self.assertRaisesRegex(RuntimeError, "symlink"):
+            health_vault.verify_backup(linked)
+
     def test_failed_backup_write_removes_incomplete_destination(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         backup = Path(self.tmp.name) / "failed-backup.enc"
