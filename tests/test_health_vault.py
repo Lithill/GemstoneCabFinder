@@ -72,6 +72,35 @@ class HealthVaultTests(unittest.TestCase):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
 
+    def test_recovery_drill_restores_multiple_entries_without_touching_original(self):
+        """Exercise the full backup/verify/restore/read workflow offline."""
+        original = {
+            ("2026-11-20", "Sleep"): {"answer": "Moderate", "notes": "private sample"},
+            ("2026-11-20", "Anxiety"): {"answer": "Mild"},
+            ("2026-11-21", "Sleep"): {"answer": "None"},
+        }
+        for (day, question), answer in original.items():
+            health_vault.put(day, question, answer, self.db)
+
+        backup = Path(self.tmp.name) / "recovery-drill.enc"
+        restored = Path(self.tmp.name) / "recovery-drill.db"
+        health_vault.encrypted_backup(backup, self.db)
+        self.assertEqual(health_vault.verify_backup(backup), len(original))
+        self.assertNotIn(b"private sample", backup.read_bytes())
+
+        health_vault.restore_backup(backup, restored)
+        for (day, question), answer in original.items():
+            self.assertEqual(health_vault.get(day, question, restored), answer)
+
+        # Mutating the restored copy must not change the original vault.
+        self.assertTrue(health_vault.delete("2026-11-20", "Sleep", restored))
+        self.assertIsNone(health_vault.get("2026-11-20", "Sleep", restored))
+        self.assertEqual(
+            health_vault.get("2026-11-20", "Sleep", self.db),
+            original[("2026-11-20", "Sleep")],
+        )
+        self.assertEqual(health_vault.verify_backup(backup), len(original))
+
     def test_verify_backup_authenticates_and_counts_encrypted_entries(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         health_vault.put("2026-11-21", "Sleep", {"answer": "Severe"}, self.db)
