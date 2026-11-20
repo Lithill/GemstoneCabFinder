@@ -94,10 +94,10 @@ def _clear_failures(identity):
         conn.execute("DELETE FROM attempts WHERE identity=?", (identity,))
 
 
-def _cookie(response, token=None):
+def _cookie(response, token=None, *, clear=False):
     if token:
         response.set_cookie(COOKIE, token, secure=True, httponly=True, samesite="Strict", path="/")
-    else:
+    elif clear:
         response.delete_cookie(COOKIE, secure=True, httponly=True, samesite="Strict", path="/")
     response.headers["Cache-Control"] = "no-store"
     response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
@@ -200,7 +200,7 @@ def logout():
     if not current or not hmac.compare_digest(supplied, current["csrf"]):
         abort(400)
     _revoke(current["nonce"])
-    return _cookie(make_response(redirect(url_for("health_auth.login"), code=303)))
+    return _cookie(make_response(redirect(url_for("health_auth.login"), code=303)), clear=True)
 
 
 def health_csrf_required():
