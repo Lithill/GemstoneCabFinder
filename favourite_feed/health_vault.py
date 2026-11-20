@@ -136,6 +136,18 @@ def get(day: str, question: str, path: Path = DEFAULT_PATH) -> dict | None:
     return record["answer"]
 
 
+
+def delete(day: str, question: str, path: Path = DEFAULT_PATH) -> bool:
+    """Offline-only deletion of one encrypted answer; never exposed as a web route."""
+    from datetime import date
+    if date.fromisoformat(day).isoformat() != day or not question or len(question) > 200:
+        raise ValueError("Invalid date or question.")
+    with _connect(path) as conn:
+        _verified(conn)
+        result = conn.execute("DELETE FROM entries WHERE entry_id=?", (_entry_id(day, question),))
+        return result.rowcount == 1
+
+
 def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
     """Produce a separately encrypted, portable SQLite snapshot; never plaintext backup."""
     destination = Path(destination).expanduser()
