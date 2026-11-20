@@ -3,6 +3,7 @@
 No live health data, server configuration, or production database is used.
 """
 import os
+import sqlite3
 from pathlib import Path
 import tempfile
 import unittest
@@ -51,6 +52,18 @@ class HealthVaultTests(unittest.TestCase):
         with patch.dict(os.environ, {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
+
+    def test_legacy_plaintext_metadata_schema_is_rejected(self):
+        legacy = Path(self.tmp.name) / "legacy.db"
+        with sqlite3.connect(legacy) as conn:
+            conn.execute("CREATE TABLE entries (day TEXT NOT NULL, question TEXT NOT NULL, encrypted_payload BLOB NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(day, question))")
+            conn.execute("CREATE TABLE vault_meta (key TEXT PRIMARY KEY, value BLOB NOT NULL)")
+            conn.execute("INSERT INTO vault_meta VALUES ('key_check', ?)", (Fernet(self.key.encode()).encrypt(b'health-vault-v1'),))
+        with self.assertRaisesRegex(RuntimeError, "Unsupported health vault schema"):
+            health_vault.get("2026-11-20", "Anxiety", legacy)
+        with self.assertRaisesRegex(RuntimeError, "Unsupported health vault schema"):
+            health_vault.encrypted_backup(Path(self.tmp.name) / "legacy.enc", legacy)
+        self.assertFalse((Path(self.tmp.name) / "legacy.enc").exists())
 
     def test_missing_key_fails_closed(self):
         with patch.dict(os.environ, {"HEALTH_VAULT_KEY": ""}):
