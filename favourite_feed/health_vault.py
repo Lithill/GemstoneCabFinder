@@ -69,17 +69,22 @@ def provision(path: Path = DEFAULT_PATH) -> None:
     # Reserve the file atomically with private permissions before SQLite writes.
     fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     os.close(fd)
-    connection = sqlite3.connect(path)
     try:
-        connection.execute("""CREATE TABLE entries (
-            entry_id TEXT PRIMARY KEY,
-            encrypted_payload BLOB NOT NULL
-        )""")
-        connection.execute("CREATE TABLE vault_meta (key TEXT PRIMARY KEY, value BLOB NOT NULL)")
-        connection.execute("INSERT INTO vault_meta VALUES ('key_check', ?)", (Fernet(_key()).encrypt(b'health-vault-v1'),))
-        connection.commit()
-    finally:
-        connection.close()
+        connection = sqlite3.connect(path)
+        try:
+            connection.execute("""CREATE TABLE entries (
+                entry_id TEXT PRIMARY KEY,
+                encrypted_payload BLOB NOT NULL
+            )""")
+            connection.execute("CREATE TABLE vault_meta (key TEXT PRIMARY KEY, value BLOB NOT NULL)")
+            connection.execute("INSERT INTO vault_meta VALUES ('key_check', ?)", (Fernet(_key()).encrypt(b'health-vault-v1'),))
+            connection.commit()
+        finally:
+            connection.close()
+    except Exception:
+        # A failed first-time setup must not leave a half-provisioned vault.
+        path.unlink()
+        raise
 
 
 def _verified(conn):
