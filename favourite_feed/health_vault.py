@@ -177,6 +177,27 @@ def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
 
 
 
+
+def _verify_encrypted_entries(conn) -> int:
+    """Authenticate every record and ensure its secret lookup matches its payload."""
+    cipher = Fernet(_key())
+    count = 0
+    for entry_id, encrypted_payload in conn.execute(
+        "SELECT entry_id, encrypted_payload FROM entries"
+    ):
+        try:
+            record = json.loads(cipher.decrypt(encrypted_payload))
+            day, question, answer = record["day"], record["question"], record["answer"]
+            if not isinstance(day, str) or not isinstance(question, str) or not isinstance(answer, dict):
+                raise RuntimeError("Invalid encrypted health entry.")
+            if not hmac.compare_digest(entry_id, _entry_id(day, question)):
+                raise RuntimeError("Encrypted health entry identity mismatch.")
+        except (InvalidToken, ValueError, TypeError, KeyError) as exc:
+            raise RuntimeError("Encrypted health entry verification failed.") from exc
+        count += 1
+    return count
+
+
 def verify_backup(source: Path) -> int:
     """Offline-only: authenticate a backup, check SQLite integrity, count entries.
 
@@ -193,7 +214,7 @@ def verify_backup(source: Path) -> int:
         _verified(check)
         if check.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise RuntimeError("Backup integrity check failed.")
-        return check.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+        return _verify_encrypted_entries(check)
     finally:
         check.close()
 
