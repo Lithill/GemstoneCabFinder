@@ -146,7 +146,7 @@ def require_health_login(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if not _valid_session():
-            return redirect(url_for("health_auth.login"), code=303)
+            return _cookie(make_response(redirect(url_for("health_auth.login"), code=303)))
         return view(*args, **kwargs)
     return wrapped
 
