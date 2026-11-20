@@ -127,9 +127,6 @@ def _valid_session():
     # Configuration removal or corruption must invalidate existing sessions too.
     if not credentials_ready():
         return None
-    # __Host- cookies must only travel over HTTPS. Never accept them on HTTP.
-    if not request.is_secure:
-        return None
     token = request.cookies.get(COOKIE, "")
     if not token:
         return None
