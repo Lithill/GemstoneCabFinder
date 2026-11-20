@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from cryptography.fernet import Fernet
+from flask import render_template
 from favourite_feed import health_auth
 from favourite_feed.health_staging import create_staging_app
 from favourite_feed.health_vault import password_hash
@@ -28,6 +29,13 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         app = create_staging_app()
         app.config.update(TESTING=True, SERVER_NAME="localhost")
         self.client = app.test_client()
+
+    def test_public_prototype_navigation_remains_unchanged(self):
+        with self.client.application.test_request_context("/symptom-tracker"):
+            html = render_template("symptom_tracker.html")
+        self.assertIn('href="/dashboard"', html)
+        self.assertIn('href="/"', html)
+        self.assertNotIn("Private tracker account / Sign out", html)
 
     def test_private_preview_has_no_health_write_routes(self):
         rules = list(self.client.application.url_map.iter_rules())
