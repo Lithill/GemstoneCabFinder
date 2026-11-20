@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My dashboard</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head>
+<body><header><h1>My dashboard</h1><nav><a href="/">Gemstone Feed</a><a href="/refresh">Refresh</a></nav></header>
+<main class="dashboard">
+<p class="dashboard-intro">Your tools, all in one place.</p>
+<section class="dashboard-grid" aria-label="Your tools">
+<article class="dashboard-card">
+<div class="dashboard-symbol" aria-hidden="true">💎</div>
+<h2>Gemstone Feed</h2>
+<p>New finds from your favourite Etsy shops.</p>
+<div class="dashboard-stats"><span><strong>{{ counts.unseen }}</strong> unseen</span><span><strong>{{ liked }}</strong> favourites</span><span><strong>{{ active_shops }}</strong> shops</span></div>
+<p class="dashboard-refresh"><strong>Refresh:</strong> {% if refresh_status.status == 'never' %}Not yet recorded{% else %}{{ refresh_status.status|capitalize }} · {{ refresh_status.done }}/{{ refresh_status.total }} shops{% if refresh_status.finished_at %}<span> · <time id="finished" datetime="{{ refresh_status.finished_at }}"></time></span>{% endif %}{% endif %}</p>
+<div class="dashboard-links"><a class="dashboard-primary" href="/">Open feed</a><a href="/?view=swipe">Swipe</a><a href="/refresh">Refresh shops</a></div>
+</article>
+<article class="dashboard-card dashboard-coming">
+<div class="dashboard-symbol" aria-hidden="true">🌿</div>
+<h2>Symptom Tracker <small>Planned</small></h2>
+<p>A private space for daily check-ins, symptom trends and notes.</p>
+<p class="dashboard-note">Not active yet. No health information is being collected or stored. We'll address security and backups before enabling it.</p>
+</article>
+</section>
+</main>
+<script>
+const t=document.getElementById('finished');
+if(t)t.textContent=new Date(t.dateTime).toLocaleString('en-GB',{timeZone:'Europe/London',dateStyle:'medium',timeStyle:'short'});
+</script><script src="{{ url_for('static',filename='refresh_worker.js') }}"></script>
+</body></html>
