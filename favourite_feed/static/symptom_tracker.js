@@ -46,7 +46,7 @@ function field(parent,label,type,options){
       el("span",{text},item);
       return radio;
     });
-    return {get value(){return (inputs.find(r=>r.checked)||inputs[0]).value;}};
+    return {get value(){return (inputs.find(r=>r.checked)||inputs[0]).value;},set value(v){inputs.forEach(r=>{r.checked=r.value===v;});}};
   }
   el("label",{for:id,text:label},wrap);
   const input=el("input",{id,type:type||"text"},wrap);
@@ -88,7 +88,29 @@ function collect(q,inputs){
 }
 function add(entry){
   if(!entry)return false;
-  diary.push(entry);renderDiary();return true;
+  const existing=diary.findIndex(item=>item.name===entry.name);
+  if(existing>=0)diary[existing]=entry;
+  else diary.push(entry);
+  renderDiary();
+  return true;
+}
+function prefill(q,inputs){
+  const saved=diary.find(item=>item.name===q.name);
+  if(!saved)return;
+  inputs.answer.value=saved.answer;
+  for(const extra of saved.extras){
+    const split=extra.indexOf(": ");
+    if(split<0)continue;
+    const key=extra.slice(0,split),value=extra.slice(split+2);
+    if(inputs[key])inputs[key].value=value;
+  }
+  inputs.notes.value=saved.notes||"";
+}
+function removePeriodDetails(){
+  for(let i=diary.length-1;i>=0;i--){
+    if(questions.some(q=>q.category==="Periods and bleeding"&&q.type!=="period"&&q.name===diary[i].name))diary.splice(i,1);
+  }
+  renderDiary();
 }
 function renderDiary(){
   $("entry-count").textContent=diary.length+" entries";
@@ -118,6 +140,7 @@ function guidedAdvance(){
   step++;
   // No bleeding today: omit all remaining period questions in this check-in.
   if(question.type==="period"&&answer==="None"){
+    removePeriodDetails();
     while(step<questions.length&&questions[step].category==="Periods and bleeding")step++;
   }
   showStep();
@@ -152,6 +175,7 @@ function showStep(){
   $("guided-progress").textContent=(step+1)+" of "+questions.length;
   $("guided-bar").max=questions.length;$("guided-bar").value=step+1;
   current=fields($("guided-fields"),q);
+  prefill(q,current);
   if(q.type==="period"){
     const answerGroup=$("guided-fields").querySelector(".tracker-radio-group");
     answerGroup.addEventListener("change",event=>{
@@ -162,9 +186,11 @@ function showStep(){
   }
   if(["yesno","severity"].includes(q.type)){
     const notesField=current.notes.closest(".tracker-field");
-    notesField.hidden=true;
+    const hasNotes=Boolean(current.notes.value);
+    notesField.hidden=!hasNotes;
     const toggleLabel=el("label",{className:"tracker-notes-toggle"},$("guided-fields"));
     const toggle=el("input",{type:"checkbox",id:"guided-notes-toggle"},toggleLabel);
+    toggle.checked=hasNotes;
     el("span",{text:"Add a note before continuing"},toggleLabel);
     toggle.addEventListener("change",()=>{notesField.hidden=!toggle.checked;if(toggle.checked)current.notes.focus();});
     guidedAutoAdvance(q);
@@ -216,6 +242,7 @@ function quickOptions(){
 function quickFields(){
   const [name,type]=groups[quickCategory].items[quickSymptom];
   current=fields($("quick-fields"),{name,type});
+  prefill({name,type},current);
 }
 $("quick-add").addEventListener("click",()=>{
   const [name,type]=groups[quickCategory].items[quickSymptom];
