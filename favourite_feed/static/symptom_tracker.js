@@ -105,6 +105,7 @@ function showMode(mode){
   $("guided").hidden=mode!=="guided";
   $("quick").hidden=mode!=="quick";
   if(mode==="guided")showStep();
+  if(mode==="quick")quickFields();
 }
 function showStep(){
   if(step>=questions.length){
