@@ -62,6 +62,16 @@ class HealthVaultTests(unittest.TestCase):
         self.assertEqual(len(opened), 4)
         self.assertTrue(all(connection.closed for connection in opened))
 
+    def _synthetic_unverified_backup(self, destination):
+        """Create deliberately damaged test fixtures without using production backup."""
+        with sqlite3.connect(self.db) as source:
+            snapshot = sqlite3.connect(":memory:")
+            try:
+                source.backup(snapshot)
+                destination.write_bytes(Fernet(self.key.encode()).encrypt(snapshot.serialize()))
+            finally:
+                snapshot.close()
+
     def test_upsert_replaces_same_day_question_only(self):
         health_vault.put("2026-11-20", "Anxiety", {"answer": "Mild"}, self.db)
         health_vault.put("2026-11-20", "Anxiety", {"answer": "Severe"}, self.db)
@@ -137,7 +147,10 @@ class HealthVaultTests(unittest.TestCase):
                     conn.execute("INSERT OR REPLACE INTO entries VALUES (?, ?)",
                                  (health_vault._entry_id(day, question), payload))
                 backup = Path(self.tmp.name) / ("oversized.enc" if len(raw_answer) > 1000 else "nan.enc")
-                health_vault.encrypted_backup(backup, self.db)
+                with self.assertRaises(RuntimeError):
+                    health_vault.encrypted_backup(backup, self.db)
+                self.assertFalse(backup.exists())
+                self._synthetic_unverified_backup(backup)
                 restored = Path(self.tmp.name) / ("oversized.db" if len(raw_answer) > 1000 else "nan.db")
                 with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
                     health_vault.verify_backup(backup)
@@ -156,7 +169,10 @@ class HealthVaultTests(unittest.TestCase):
             conn.execute("INSERT INTO entries VALUES (?, ?)",
                          (health_vault._entry_id(day, question), payload))
         backup = Path(self.tmp.name) / "invalid-date.enc"
-        health_vault.encrypted_backup(backup, self.db)
+        with self.assertRaises(RuntimeError):
+            health_vault.encrypted_backup(backup, self.db)
+        self.assertFalse(backup.exists())
+        self._synthetic_unverified_backup(backup)
         restored = Path(self.tmp.name) / "invalid-date-restored.db"
         with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
             health_vault.verify_backup(backup)
@@ -171,7 +187,10 @@ class HealthVaultTests(unittest.TestCase):
             conn.execute("UPDATE entries SET encrypted_payload=?",
                          (b"not-a-valid-fernet-token",))
         backup = Path(self.tmp.name) / "tampered-entry.enc"
-        health_vault.encrypted_backup(backup, self.db)
+        with self.assertRaises(RuntimeError):
+            health_vault.encrypted_backup(backup, self.db)
+        self.assertFalse(backup.exists())
+        self._synthetic_unverified_backup(backup)
         restored = Path(self.tmp.name) / "tampered-restored.db"
         with self.assertRaisesRegex(RuntimeError, "entry verification failed"):
             health_vault.verify_backup(backup)
@@ -184,7 +203,10 @@ class HealthVaultTests(unittest.TestCase):
         with sqlite3.connect(self.db) as conn:
             conn.execute("UPDATE entries SET entry_id=?", ("0" * 64,))
         backup = Path(self.tmp.name) / "mismatched-entry.enc"
-        health_vault.encrypted_backup(backup, self.db)
+        with self.assertRaises(RuntimeError):
+            health_vault.encrypted_backup(backup, self.db)
+        self.assertFalse(backup.exists())
+        self._synthetic_unverified_backup(backup)
         with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
             health_vault.verify_backup(backup)
 
