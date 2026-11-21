@@ -168,6 +168,9 @@ def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
         snapshot = sqlite3.connect(":memory:")
         try:
             source.backup(snapshot)
+            if snapshot.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                raise RuntimeError("Vault integrity check failed; backup not created.")
+            _verify_encrypted_entries(snapshot)
             raw = snapshot.serialize()
         finally:
             snapshot.close()
