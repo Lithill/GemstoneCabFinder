@@ -105,6 +105,35 @@ class OfflineCheckinTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 health_checkins.put_checkin("2026-11-21", {}, path=self.db)
 
+    def test_empty_checkin_preserves_existing_encrypted_rows(self):
+        day = "2026-11-21"
+        health_checkins.put_checkin(day, {
+            "Brain fog": {"answer": "Mild"},
+            "Hot flushes": {"answer": "No"},
+        }, path=self.db)
+        with sqlite3.connect(self.db) as conn:
+            before = conn.execute(
+                "SELECT entry_id, encrypted_payload FROM entries ORDER BY entry_id"
+            ).fetchall()
+        self.assertEqual(health_checkins.put_checkin(day, {}, path=self.db), 0)
+        with sqlite3.connect(self.db) as conn:
+            after = conn.execute(
+                "SELECT entry_id, encrypted_payload FROM entries ORDER BY entry_id"
+            ).fetchall()
+        self.assertEqual(after, before)
+
+    def test_empty_checkin_rejects_unverified_vault_schema(self):
+        invalid = Path(self.temp.name) / "wrong-schema.db"
+        with sqlite3.connect(invalid) as conn:
+            conn.execute("CREATE TABLE entries (day TEXT, question TEXT, answer TEXT)")
+        with self.assertRaises(RuntimeError):
+            health_checkins.put_checkin("2026-11-21", {}, path=invalid)
+        with sqlite3.connect(invalid) as conn:
+            self.assertEqual(
+                [row[1] for row in conn.execute("PRAGMA table_info(entries)")],
+                ["day", "question", "answer"],
+            )
+
     def test_empty_checkin_rejects_invalid_calendar_dates(self):
         for invalid_day in (None, 20261121, "", "not-a-date", "2026-02-30", "2026-1-2"):
             with self.subTest(day=invalid_day):
