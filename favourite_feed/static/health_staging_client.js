@@ -49,6 +49,16 @@
       document.getElementById("staging-load").disabled = false;
     }
   }
+  window.stagingDeleteEntry = question => run(async day => {
+    if (!confirm("Permanently delete the saved answer for " + question + " on " + day + "? Older backups may still contain it.")) return;
+    const result = await api("delete/" + encodeURIComponent(day), "POST", {question});
+    if (result.deleted) {
+      const index = diary.findIndex(entry => entry.name === question);
+      if (index >= 0) diary.splice(index, 1);
+      renderDiary();
+    }
+    show(result.deleted ? "Deleted saved answer for " + question + "." : "No saved answer found for that date.");
+  });
   document.getElementById("staging-save").addEventListener("click", () => run(async day => {
     // Notes never leave the browser; only canonical diary fields are transmitted.
     const entries = diary.map(({name, answer, extras}) => ({name, answer, extras, notes:""}));
