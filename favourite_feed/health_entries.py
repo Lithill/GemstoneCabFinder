@@ -16,12 +16,21 @@ def put_validated(day: str, question: str, answer: dict, *, path: Path) -> None:
     health_vault.put(entry["day"], entry["question"], entry["answer"], path)
 
 
-def get_validated(day: str, question: str, *, path: Path) -> dict | None:
-    """Read a known question and reject invalid or damaged stored answers."""
-    if not isinstance(question, str) or question not in health_vault_questions():
-        raise ValueError("Unknown symptom question.")
-    # Validation is also applied to the date, even for missing records.
+def delete_validated(day: str, question: str, *, path: Path) -> bool:
+    """Delete exactly one known entry from an existing offline vault.
+
+    Validate both identifiers before accessing the vault. This is logical
+    deletion, not guaranteed erasure from journals, snapshots or backups.
+    """
+    _validate_identity(day, question)
+    return health_vault.delete(day, question, path)
+
+
+def _validate_identity(day: str, question: str) -> None:
     from datetime import date
+    from favourite_feed.health_answers import QUESTIONS
+    if not isinstance(question, str) or question not in QUESTIONS:
+        raise ValueError("Unknown symptom question.")
     if not isinstance(day, str):
         raise ValueError("Invalid entry date.")
     try:
@@ -29,12 +38,13 @@ def get_validated(day: str, question: str, *, path: Path) -> dict | None:
             raise ValueError
     except ValueError as exc:
         raise ValueError("Invalid entry date.") from exc
+
+
+def get_validated(day: str, question: str, *, path: Path) -> dict | None:
+    """Read a known question and reject invalid or damaged stored answers."""
+    _validate_identity(day, question)
     answer = health_vault.get(day, question, path)
     if answer is None:
         return None
     return validate_entry(day, question, answer)["answer"]
 
-
-def health_vault_questions():
-    from favourite_feed.health_answers import QUESTIONS
-    return QUESTIONS
