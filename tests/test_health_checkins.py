@@ -60,6 +60,26 @@ class OfflineCheckinTests(unittest.TestCase):
             }, path=self.db)
         self.assertEqual(health_entries.get_validated(day, "Hot flushes", path=self.db), {"answer": "Yes"})
 
+    def test_database_failure_rolls_back_entire_checkin(self):
+        """A database error on a later row must undo earlier inserts."""
+        day = "2026-11-21"
+        health_checkins.put_checkin(day, {"Brain fog": {"answer": "Mild"}}, path=self.db)
+        with sqlite3.connect(self.db) as conn:
+            conn.execute("""
+                CREATE TRIGGER reject_hot_flushes BEFORE INSERT ON entries
+                WHEN NEW.entry_id = ?
+                BEGIN
+                    SELECT RAISE(ABORT, 'simulated failure');
+                END
+            """.replace("= ?", "= '" + health_vault._entry_id(day, "Hot flushes") + "'"))
+        with self.assertRaises(sqlite3.IntegrityError):
+            health_checkins.put_checkin(day, {
+                "Brain fog": {"answer": "Severe"},
+                "Hot flushes": {"answer": "Yes"},
+            }, path=self.db)
+        self.assertEqual(health_entries.get_validated(day, "Brain fog", path=self.db), {"answer": "Mild"})
+        self.assertIsNone(health_entries.get_validated(day, "Hot flushes", path=self.db))
+
     def test_missing_vault_is_not_created(self):
         missing = Path(self.temp.name) / "not-provisioned.db"
         with self.assertRaises(FileNotFoundError):
