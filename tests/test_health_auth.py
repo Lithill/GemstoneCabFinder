@@ -51,6 +51,44 @@ class HealthLoginTests(unittest.TestCase):
     def _login(self, password="a strong test password 123", csrf=None):
         return self.client.post("/health-auth/login", data={"password": password, "csrf": csrf if csrf is not None else self.login_csrf})
 
+    def test_login_and_logout_close_rate_limit_connections(self):
+        original_connection = health_auth._rate_connection
+        opened = []
+
+        class TrackedConnection:
+            def __init__(self, connection):
+                self.connection = connection
+                self.closed = False
+
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+
+            def __enter__(self):
+                self.connection.__enter__()
+                return self
+
+            def __exit__(self, *args):
+                return self.connection.__exit__(*args)
+
+            def close(self):
+                self.closed = True
+                self.connection.close()
+
+        def tracked_connection():
+            tracked = TrackedConnection(original_connection())
+            opened.append(tracked)
+            return tracked
+
+        with patch.object(health_auth, "_rate_connection", side_effect=tracked_connection):
+            self.assertEqual(self._login().status_code, 303)
+            self.assertEqual(self.client.get("/health-auth/").status_code, 200)
+            session = self.client.get_cookie("__Host-health_session")
+            csrf = health_auth._signer("health-session-v1").loads(session.value)["csrf"]
+            self.assertEqual(self.client.post("/health-auth/logout", data={"csrf": csrf}).status_code, 303)
+            self.assertEqual(self.client.get("/health-auth/").status_code, 303)
+        self.assertGreaterEqual(len(opened), 4)
+        self.assertTrue(all(connection.closed for connection in opened))
+
     def test_login_requires_csrf(self):
         self.assertEqual(self._login(csrf="invalid").status_code, 400)
 
