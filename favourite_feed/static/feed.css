@@ -26,3 +26,6 @@ body:has(.swipe-main){overflow-x:hidden}.swipe-main{overflow:visible}#swipe-card
 .dashboard-coming small{font-size:.7rem;font-weight:500}
 .dashboard-note{font-size:.9rem;color:#686868}
 @media(max-width:600px){.dashboard{padding:20px 12px}.dashboard-card{padding:20px}}
+
+/* Ten-stone grid pagination and one-click batch dismissal. */
+.page-status{color:#666;margin:12px 0}.page-dismiss{margin:24px 0;padding:20px;border:1px solid #c6d4ca;background:#fff;border-radius:12px;text-align:center}.page-dismiss button{background:#38654b;color:#fff;font-weight:700;min-height:48px}.page-dismiss p{font-size:.9rem;color:#666;margin-bottom:0}.pagination{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:24px;margin:24px 0}.pagination a{display:inline-block;padding:10px 14px;border:1px solid #c6d4ca;border-radius:8px;color:#38654b;font-weight:600}
