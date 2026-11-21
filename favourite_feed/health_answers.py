@@ -81,15 +81,15 @@ def validate_entry(day, question, answer):
     allowed = {"answer"}
     if kind == "period" and value != "None":
         allowed.add("flow")
-        if "flow" in answer and answer["flow"] not in FLOW:
+        if "flow" in answer and (not isinstance(answer["flow"], str) or answer["flow"] not in FLOW):
             raise ValueError("Invalid bleeding flow.")
     if kind == "date":
         allowed.add("detail")
-        if answer.get("detail") not in {"Start", "End"}:
+        if not isinstance(answer.get("detail"), str) or answer["detail"] not in {"Start", "End"}:
             raise ValueError("Invalid period event.")
     if kind == "weight":
         allowed.add("unit")
-        if answer.get("unit") not in UNITS:
+        if not isinstance(answer.get("unit"), str) or answer["unit"] not in UNITS:
             raise ValueError("Invalid weight unit.")
     if kind == "sleep":
         allowed.add("hours")
