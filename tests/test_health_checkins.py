@@ -64,14 +64,15 @@ class OfflineCheckinTests(unittest.TestCase):
         """A database error on a later row must undo earlier inserts."""
         day = "2026-11-21"
         health_checkins.put_checkin(day, {"Brain fog": {"answer": "Mild"}}, path=self.db)
+        target_id = health_vault._entry_id(day, "Hot flushes")
         with sqlite3.connect(self.db) as conn:
-            conn.execute("""
+            conn.execute(f"""
                 CREATE TRIGGER reject_hot_flushes BEFORE INSERT ON entries
-                WHEN NEW.entry_id = ?
+                WHEN NEW.entry_id = '{target_id}'
                 BEGIN
                     SELECT RAISE(ABORT, 'simulated failure');
                 END
-            """.replace("= ?", "= '" + health_vault._entry_id(day, "Hot flushes") + "'"))
+            """)
         with self.assertRaises(sqlite3.IntegrityError):
             health_checkins.put_checkin(day, {
                 "Brain fog": {"answer": "Severe"},
