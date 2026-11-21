@@ -124,6 +124,10 @@ function renderDiary(){
     if(item.notes)el("p",{text:item.notes},info);
     const remove=el("button",{type:"button",text:"Remove", "aria-label":"Remove "+item.name},row);
     remove.addEventListener("click",()=>{diary.splice(i,1);renderDiary();});
+    if (typeof window.stagingDeleteEntry === "function") {
+      const deleteSaved=el("button",{type:"button",text:"Delete saved entry"},row);
+      deleteSaved.addEventListener("click",()=>window.stagingDeleteEntry(item.name));
+    }
   });
 }
 function showMode(mode){
