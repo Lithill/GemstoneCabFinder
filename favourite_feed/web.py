@@ -80,7 +80,40 @@ def action(listing_id):
         with connect_database() as conn:
             saved = conn.execute("SELECT liked, seen_at FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
         return jsonify(listing_id=listing_id, liked=bool(saved["liked"]), seen=bool(saved["seen_at"]))
-    return redirect(url_for("index", mode=request.form.get("mode", "unseen"), view="swipe" if request.form.get("view") == "swipe" else "grid"))
+    page = request.form.get("page", "1")
+    try:
+        page = max(1, int(page))
+    except ValueError:
+        page = 1
+    return redirect(url_for("index", mode=request.form.get("mode", "unseen"), view="swipe" if request.form.get("view") == "swipe" else "grid", page=page))
+
+
+@app.post("/mark-page-seen")
+def mark_page_seen():
+    """Dismiss exactly the displayed unseen IDs; never alter favourites."""
+    raw_ids = request.form.getlist("listing_id")
+    if not 1 <= len(raw_ids) <= 10:
+        abort(400)
+    try:
+        ids = [int(value) for value in raw_ids]
+    except ValueError:
+        abort(400)
+    if any(value <= 0 for value in ids) or len(set(ids)) != len(ids):
+        abort(400)
+    with connect_database() as conn:
+        ensure_history(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        now = datetime.now(timezone.utc).isoformat()
+        for listing_id in ids:
+            row = conn.execute("SELECT seen_at, liked FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+            if row is None:
+                abort(400)
+            if row["seen_at"]:
+                continue
+            conn.execute("INSERT INTO feed_actions(listing_id, old_seen, old_liked) VALUES (?, ?, ?)",
+                         (listing_id, row["seen_at"], row["liked"]))
+            conn.execute("UPDATE listings SET seen_at=? WHERE listing_id=?", (now, listing_id))
+    return redirect(url_for("index", mode="unseen", page=1), code=303)
 
 
 @app.post("/undo")
@@ -244,7 +277,18 @@ def index():
         listings.sort(key=lambda row: (row["seen_at"] or "", row["listing_id"]), reverse=True)
     if mode == "unseen" and request.args.get("view") == "swipe":
         return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings), refresh_status=refresh_jobs.snapshot(), breakdown=breakdown)
-    return render_template("feed.html", listings=listings, mode=mode, refresh_status=refresh_jobs.snapshot(), breakdown=breakdown)
+    total_listings = len(listings)
+    page_size = 10
+    total_pages = max(1, (total_listings + page_size - 1) // page_size)
+    try:
+        page = int(request.args.get("page", "1"))
+    except ValueError:
+        page = 1
+    page = min(max(1, page), total_pages)
+    listings = listings[(page - 1) * page_size:page * page_size]
+    return render_template("feed.html", listings=listings, mode=mode,
+                           total_listings=total_listings, page=page, total_pages=total_pages,
+                           refresh_status=refresh_jobs.snapshot(), breakdown=breakdown)
 
 
 @app.post("/etsy/<int:listing_id>")
