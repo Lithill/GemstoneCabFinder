@@ -21,6 +21,9 @@ def put_checkin(day: str, answers: dict, *, path: Path) -> int:
         raise ValueError("Check-in must be a question-to-answer mapping.")
     validated = [validate_entry(day, question, answer) for question, answer in answers.items()]
     if not validated:
+        # A no-op still requires a provisioned vault and the correct key.
+        with closing(health_vault._connect(path)) as conn:
+            health_vault._verified(conn)
         return 0
     cipher = Fernet(health_vault._key())
     prepared = []
