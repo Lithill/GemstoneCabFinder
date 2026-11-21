@@ -1,9 +1,10 @@
-"""Isolated health login blueprint. NOT registered in the live Flask app.
+"""Isolated health login blueprint. Disabled in production unless explicitly enabled.
 
 The existing symptom-tracker preview is unaffected. Health data routes are
 not implemented. Registration requires a separate security review.
 """
 import hashlib
+from contextlib import closing
 import hmac
 import os
 from pathlib import Path
@@ -81,13 +82,13 @@ def _rate_connection():
 
 
 def _locked(identity, now):
-    with _rate_connection() as conn:
+    with closing(_rate_connection()) as conn, conn:
         row = conn.execute("SELECT failures, locked_until FROM attempts WHERE identity=?", (identity,)).fetchone()
         return bool(row and row[1] > now)
 
 
 def _failure(identity, now):
-    with _rate_connection() as conn:
+    with closing(_rate_connection()) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT failures, locked_until FROM attempts WHERE identity=?", (identity,)).fetchone()
         if row and row[1] > now:
@@ -98,7 +99,7 @@ def _failure(identity, now):
 
 
 def _clear_failures(identity):
-    with _rate_connection() as conn:
+    with closing(_rate_connection()) as conn, conn:
         conn.execute("DELETE FROM attempts WHERE identity=?", (identity,))
 
 
@@ -118,7 +119,7 @@ def _nonce_hash(nonce):
 
 
 def _revoke(nonce):
-    with _rate_connection() as conn:
+    with closing(_rate_connection()) as conn, conn:
         conn.execute("INSERT OR REPLACE INTO revoked_sessions VALUES (?, ?)", (_nonce_hash(nonce), int(time.time()) + SESSION_IDLE_SECONDS))
         conn.execute("DELETE FROM revoked_sessions WHERE expires_at < ?", (int(time.time()),))
 
@@ -133,7 +134,7 @@ def _valid_session():
     try:
         data = _signer("health-session-v1").loads(token, max_age=SESSION_IDLE_SECONDS)
         if data.get("auth") is True and isinstance(data.get("csrf"), str) and isinstance(data.get("nonce"), str):
-            with _rate_connection() as conn:
+            with closing(_rate_connection()) as conn, conn:
                 revoked = conn.execute("SELECT 1 FROM revoked_sessions WHERE nonce_hash=?", (_nonce_hash(data["nonce"]),)).fetchone()
             if not revoked:
                 return data
