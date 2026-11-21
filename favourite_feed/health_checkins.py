@@ -3,12 +3,13 @@
 Never imported by Flask routes. No vault provisioning or web saving.
 """
 from contextlib import closing
+from datetime import date
 import json
 from pathlib import Path
 
 from cryptography.fernet import Fernet
 
-from favourite_feed.health_answers import validate_entry
+from favourite_feed.health_answers import QUESTIONS, validate_entry
 from favourite_feed import health_vault
 
 
@@ -17,8 +18,15 @@ def put_checkin(day: str, answers: dict, *, path: Path) -> int:
 
     Empty dict is a no-op. A failure never commits a partial check-in.
     """
-    if not isinstance(answers, dict) or len(answers) > 36:
+    if not isinstance(answers, dict) or len(answers) > len(QUESTIONS):
         raise ValueError("Check-in must be a question-to-answer mapping.")
+    if not isinstance(day, str):
+        raise ValueError("Invalid check-in date.")
+    try:
+        if date.fromisoformat(day).isoformat() != day:
+            raise ValueError
+    except ValueError as exc:
+        raise ValueError("Invalid check-in date.") from exc
     validated = [validate_entry(day, question, answer) for question, answer in answers.items()]
     if not validated:
         # A no-op still requires a provisioned vault and the correct key.
