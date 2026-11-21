@@ -50,6 +50,39 @@ class ValidatedHealthEntryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             health_entries.get_validated("2026-11-21", "Unknown", path=self.db)
 
+    def test_delete_only_one_day_and_question(self):
+        entries = [
+            ("2026-11-20", "Brain fog", {"answer": "Mild"}),
+            ("2026-11-20", "Hot flushes", {"answer": "Yes"}),
+            ("2026-11-21", "Brain fog", {"answer": "Severe"}),
+        ]
+        for day, question, answer in entries:
+            health_entries.put_validated(day, question, answer, path=self.db)
+        self.assertTrue(health_entries.delete_validated("2026-11-20", "Brain fog", path=self.db))
+        self.assertFalse(health_entries.delete_validated("2026-11-20", "Brain fog", path=self.db))
+        self.assertIsNone(health_entries.get_validated("2026-11-20", "Brain fog", path=self.db))
+        self.assertEqual(health_entries.get_validated("2026-11-20", "Hot flushes", path=self.db), {"answer": "Yes"})
+        self.assertEqual(health_entries.get_validated("2026-11-21", "Brain fog", path=self.db), {"answer": "Severe"})
+
+    def test_delete_rejects_unknown_question_and_invalid_date(self):
+        health_entries.put_validated("2026-11-21", "Brain fog", {"answer": "Mild"}, path=self.db)
+        for day, question in [
+            ("2026-02-30", "Brain fog"),
+            ("2026-11-21", "Not a symptom"),
+            (None, "Brain fog"),
+        ]:
+            with self.subTest(day=day, question=question):
+                with self.assertRaises(ValueError):
+                    health_entries.delete_validated(day, question, path=self.db)
+        self.assertEqual(health_entries.get_validated("2026-11-21", "Brain fog", path=self.db), {"answer": "Mild"})
+
+    def test_delete_wrong_key_does_not_remove_answer(self):
+        health_entries.put_validated("2026-11-21", "Brain fog", {"answer": "Mild"}, path=self.db)
+        with patch.dict(os.environ, {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
+            with self.assertRaises(RuntimeError):
+                health_entries.delete_validated("2026-11-21", "Brain fog", path=self.db)
+        self.assertEqual(health_entries.get_validated("2026-11-21", "Brain fog", path=self.db), {"answer": "Mild"})
+
     def test_missing_vault_is_never_automatically_created(self):
         missing = Path(self.temp.name) / "never-create.db"
         with self.assertRaises(FileNotFoundError):
