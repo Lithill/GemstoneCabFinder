@@ -74,8 +74,21 @@ class OfflineCheckinTests(unittest.TestCase):
                 health_checkins.put_checkin(day, {"Brain fog": {"answer": "Severe"}}, path=self.db)
         self.assertEqual(health_entries.get_validated(day, "Brain fog", path=self.db), {"answer": "Mild"})
 
-    def test_empty_checkin_is_noop(self):
+    def test_empty_checkin_is_noop_only_with_valid_vault(self):
         self.assertEqual(health_checkins.put_checkin("2026-11-21", {}, path=self.db), 0)
+        missing = Path(self.temp.name) / "no-vault.db"
+        with self.assertRaises(FileNotFoundError):
+            health_checkins.put_checkin("2026-11-21", {}, path=missing)
+        self.assertFalse(missing.exists())
+        with patch.dict(os.environ, {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
+            with self.assertRaises(RuntimeError):
+                health_checkins.put_checkin("2026-11-21", {}, path=self.db)
+
+    def test_empty_checkin_rejects_bad_input(self):
+        for invalid in (None, [], {"not a question": {"answer": "Yes"}}):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    health_checkins.put_checkin("2026-11-21", invalid, path=self.db)
 
 
 if __name__ == "__main__":
