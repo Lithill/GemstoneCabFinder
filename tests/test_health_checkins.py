@@ -84,6 +84,13 @@ class OfflineCheckinTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 health_checkins.put_checkin("2026-11-21", {}, path=self.db)
 
+    def test_empty_checkin_rejects_invalid_calendar_dates(self):
+        for invalid_day in (None, 20261121, "", "not-a-date", "2026-02-30", "2026-1-2"):
+            with self.subTest(day=invalid_day):
+                with self.assertRaises(ValueError):
+                    health_checkins.put_checkin(invalid_day, {}, path=self.db)
+        self.assertEqual(health_checkins.put_checkin("2026-11-21", {}, path=self.db), 0)
+
     def test_empty_checkin_rejects_bad_input(self):
         for invalid in (None, [], {"not a question": {"answer": "Yes"}}):
             with self.subTest(invalid=invalid):
