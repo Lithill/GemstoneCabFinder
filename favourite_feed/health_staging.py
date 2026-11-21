@@ -4,6 +4,7 @@ No health answers are transmitted or saved. The production app imports this
 module only when HEALTH_TRACKER_PREVIEW_ENABLED=1 is explicitly configured.
 """
 from flask import Flask, make_response, render_template
+import os
 
 from favourite_feed.health_auth import health_auth, require_health_login
 
@@ -11,15 +12,17 @@ from favourite_feed.health_auth import health_auth, require_health_login
 def register_private_preview(app):
     """Add login and protected preview routes to a Flask app, without write APIs."""
     app.register_blueprint(health_auth)
+    from favourite_feed.health_api import register_staging_api
+    register_staging_api(app)
 
     @app.get("/private-symptom-tracker")
     @require_health_login
     def private_symptom_tracker():
-        response = make_response(render_template("symptom_tracker.html", private_preview=True))
+        response = make_response(render_template("symptom_tracker.html", private_preview=True, storage_staging=os.environ.get("HEALTH_STAGING_STORAGE_ENABLED") == "1"))
         response.headers["Cache-Control"] = "no-store"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self'; "
-            "img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+            "img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
         )
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
