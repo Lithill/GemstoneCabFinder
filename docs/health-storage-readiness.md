@@ -1,8 +1,7 @@
 # Health tracker: security staging (NOT LIVE)
 
-This branch contains an **offline-only** encrypted SQLite vault foundation and an isolated health login blueprint that is **not registered with the Flask app**.
-The existing `/symptom-tracker` remains a non-saving prototype. No health API,
-login, cookies, health-data writes or data migration have been enabled.
+This branch contains an **offline-only** encrypted SQLite vault foundation and an isolated health login blueprint and an opt-in private preview that are **disabled by default** in the Flask app.
+The existing `/symptom-tracker` remains a non-saving prototype. No health API, login, cookies, health-data writes or data migration are enabled on the live site.
 
 ## Secrets and setup (manual, later)
 
@@ -16,21 +15,21 @@ login, cookies, health-data writes or data migration have been enabled.
 
 ## Must complete before health data collection
 
-1. Review and test the staged, **unregistered** `health_auth` blueprint: strong password verifier, secure signed session cookie with 20-minute expiry, login CSRF token, and persistent per-address login throttling. Add a usable logout form, session invalidation/rotation strategy, stronger abuse protection, and automated login/logout/security tests before registering any routes. Never reuse the gemstone site's weak shared password.
+1. Review the opt-in `health_auth` blueprint and its deployment settings. It already has a scrypt password verifier, secure signed 20-minute session cookie, login CSRF, persistent per-address throttling, logout with revocation, and automated tests. Before enabling even the private preview, verify proxy/HTTPS handling, dependency installation, strong independent credentials and practical abuse limits on the free host. Never reuse the gemstone site's shared password.
 2. Ensure all read/write routes require authentication, use no-store caching and a restrictive CSP, and never log answers. Disable browser caching of sensitive pages.
 3. Test server-side per-day upsert and prefilled guided/quick check-ins, including timezone/date boundaries and period skip behavior.
 4. Test encrypted backup, off-host copy, recovery, and restore drills; agree on backup cadence and retention. Keep secrets out of backups and version control.
 5. Assess free-hosting storage, backups, operational constraints, and the risks of storing sensitive health information on a shared free hosting tier. Confirm the user is comfortable with the risks before turning on collection.
 
-**Important:** Fernet encrypts individual record payloads at rest, but SQLite
-metadata (dates, question names, update timestamps) remains plaintext.
-The database file itself is not fully encrypted. This distinction matters
-for health information; consider encrypting metadata or full-database encryption
-before production use. Encrypted backups encrypt the complete snapshot.
+**Important:** Fernet encrypts each entry's answer, date and question name; the
+SQLite entries table stores only a keyed HMAC identifier and ciphertext. SQLite
+file structure and record counts remain visible, and the live database file is
+not fully encrypted. Encrypted backups encrypt the complete SQLite snapshot.
+SQLite deleted pages, journals and host backups still require careful handling.
 
 ## Automated offline checks
 
-The development branch includes `tests/test_health_auth.py`, `tests/test_health_vault.py`, and `.github/workflows/health-security-tests.yml`. The workflow runs on pushes to `feature/favourite-feed` using free GitHub-hosted runner capacity subject to the repository's Actions allowance. Check the actual workflow result before treating tests as passed; the presence of test code alone is not verification. The tests use only synthetic values and temporary databases, never production health data.
+The development branch includes `tests/test_health_auth.py`, `tests/test_health_vault.py`, `tests/test_health_staging.py`, and `.github/workflows/health-security-tests.yml`. The workflow runs on pushes to `feature/favourite-feed` using free GitHub-hosted runner capacity subject to the repository's Actions allowance. Check the actual workflow result before treating tests as passed; the presence of test code alone is not verification. The tests use only synthetic values and temporary databases, never production health data.
 
 ## Vault schema privacy revision
 
@@ -85,3 +84,22 @@ existing health vault. These commands do not activate web collection.
 A passing automated recovery drill is not a substitute for testing a real
 deployment's backup permissions, off-host backup custody, and restoration
 procedure before enabling health-data storage.
+
+## Remaining decisions and work (November 2026)
+
+**Can proceed without user input:** continue security regression tests; review
+input validation, privacy headers, session and backup failure handling; add
+server-side tracker logic and synthetic tests **behind disabled-by-default
+routes only**, without activating collection; keep documentation current.
+The health login and vault SQLite connections are explicitly closed, with
+regression coverage. Git ignores common health database, backup and private
+configuration filenames as a secondary safety net; secrets and health records
+must still be kept outside the repository.
+
+**Requires user approval or involvement before real collection:** agree on a
+private password and key custody/recovery plan; decide where encrypted backups
+will be stored, their frequency and retention; assess the free PythonAnywhere
+hosting and threat model together; confirm consent to activate storage and
+perform a deployment review. No production health vault is provisioned or
+populated by these development changes. Do not activate the private preview
+or any health-data write endpoint as part of routine gemstone deployment.
