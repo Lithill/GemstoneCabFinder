@@ -20,3 +20,16 @@ data/favourite_feed.db-*
 # Isolated feed demo database
 data/favourite_feed_demo.db
 data/favourite_feed_demo.db-*
+
+# Private symptom-tracker secrets, vault databases and encrypted backups.
+# Keep these outside the repository; ignore accidental local copies too.
+.gemstonecabfinder-private/
+health_vault.db*
+health_login_limits.db*
+health-*.backup
+health-*.backup.enc
+health-*.enc
+*.health-backup
+*.health-backup.enc
+.env.*
+!.env.example
