@@ -26,6 +26,19 @@
 <div id="quick-fields"></div>
 <button type="button" id="quick-add" class="tracker-primary">Add to preview diary</button>
 </section>
+{% if storage_staging %}
+<section id="staging-storage" aria-label="Private staging check-ins">
+<h2>Private staging check-in</h2>
+<p>Test environment only. Entries are not saved until you select Save check-in. Notes are never sent or stored.</p>
+<label for="staging-day">Check-in date</label>
+<input id="staging-day" type="date" required>
+<div class="tracker-actions">
+<button type="button" id="staging-load">Load saved day</button>
+<button type="button" id="staging-save" class="tracker-primary">Save check-in</button>
+</div>
+<p id="staging-status" role="status" aria-live="polite"></p>
+</section>
+{% endif %}
 <section id="summary" class="tracker-summary" aria-live="polite">
 <h2>Preview diary <small id="entry-count">0 entries</small></h2>
 <p id="empty-diary">Your temporary entries will appear here. No data is stored.</p>
@@ -35,4 +48,5 @@
 <p class="tracker-footnote">This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.</p>
 </main>
 <script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_staging_client.js') }}" defer></script>{% endif %}
 </body></html>
