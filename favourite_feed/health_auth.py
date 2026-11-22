@@ -75,10 +75,14 @@ def _rate_connection():
     RATE_DB.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(RATE_DB.parent, 0o700)
     conn = sqlite3.connect(RATE_DB, timeout=10)
-    conn.execute("CREATE TABLE IF NOT EXISTS attempts (identity TEXT PRIMARY KEY, failures INTEGER NOT NULL, locked_until INTEGER NOT NULL)")
-    conn.execute("CREATE TABLE IF NOT EXISTS revoked_sessions (nonce_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
-    os.chmod(RATE_DB, 0o600)
-    return conn
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS attempts (identity TEXT PRIMARY KEY, failures INTEGER NOT NULL, locked_until INTEGER NOT NULL)")
+        conn.execute("CREATE TABLE IF NOT EXISTS revoked_sessions (nonce_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
+        os.chmod(RATE_DB, 0o600)
+        return conn
+    except Exception:
+        conn.close()
+        raise
 
 
 def _locked(identity, now):
@@ -133,7 +137,7 @@ def _valid_session():
         return None
     try:
         data = _signer("health-session-v1").loads(token, max_age=SESSION_IDLE_SECONDS)
-        if data.get("auth") is True and isinstance(data.get("csrf"), str) and isinstance(data.get("nonce"), str):
+        if isinstance(data, dict) and data.get("auth") is True and isinstance(data.get("csrf"), str) and isinstance(data.get("nonce"), str):
             with closing(_rate_connection()) as conn, conn:
                 revoked = conn.execute("SELECT 1 FROM revoked_sessions WHERE nonce_hash=?", (_nonce_hash(data["nonce"]),)).fetchone()
             if not revoked:
