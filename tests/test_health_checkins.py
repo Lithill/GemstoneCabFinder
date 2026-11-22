@@ -1,5 +1,6 @@
 """Synthetic-only tests for atomic offline symptom check-ins."""
 import os
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -34,7 +35,7 @@ class OfflineCheckinTests(unittest.TestCase):
         self.assertEqual(health_checkins.put_checkin(day, {"Brain fog": {"answer": "Severe"}}, path=self.db), 1)
         self.assertEqual(health_entries.get_validated(day, "Brain fog", path=self.db), {"answer": "Severe"})
         self.assertEqual(health_entries.get_validated(day, "Hot flushes", path=self.db), {"answer": "Yes"})
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0], 3)
         raw = self.db.read_bytes()
         self.assertNotIn(b"Brain fog", raw)
@@ -65,7 +66,7 @@ class OfflineCheckinTests(unittest.TestCase):
         day = "2026-11-21"
         health_checkins.put_checkin(day, {"Brain fog": {"answer": "Mild"}}, path=self.db)
         target_id = health_vault._entry_id(day, "Hot flushes")
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute(f"""
                 CREATE TRIGGER reject_hot_flushes BEFORE INSERT ON entries
                 WHEN NEW.entry_id = '{target_id}'
@@ -111,12 +112,12 @@ class OfflineCheckinTests(unittest.TestCase):
             "Brain fog": {"answer": "Mild"},
             "Hot flushes": {"answer": "No"},
         }, path=self.db)
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             before = conn.execute(
                 "SELECT entry_id, encrypted_payload FROM entries ORDER BY entry_id"
             ).fetchall()
         self.assertEqual(health_checkins.put_checkin(day, {}, path=self.db), 0)
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             after = conn.execute(
                 "SELECT entry_id, encrypted_payload FROM entries ORDER BY entry_id"
             ).fetchall()
@@ -124,11 +125,11 @@ class OfflineCheckinTests(unittest.TestCase):
 
     def test_empty_checkin_rejects_unverified_vault_schema(self):
         invalid = Path(self.temp.name) / "wrong-schema.db"
-        with sqlite3.connect(invalid) as conn:
+        with closing(sqlite3.connect(invalid)) as conn, conn:
             conn.execute("CREATE TABLE entries (day TEXT, question TEXT, answer TEXT)")
         with self.assertRaises(RuntimeError):
             health_checkins.put_checkin("2026-11-21", {}, path=invalid)
-        with sqlite3.connect(invalid) as conn:
+        with closing(sqlite3.connect(invalid)) as conn, conn:
             self.assertEqual(
                 [row[1] for row in conn.execute("PRAGMA table_info(entries)")],
                 ["day", "question", "answer"],
