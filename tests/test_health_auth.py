@@ -89,6 +89,14 @@ class HealthLoginTests(unittest.TestCase):
         self.assertGreaterEqual(len(opened), 4)
         self.assertTrue(all(connection.closed for connection in opened))
 
+    def test_signed_but_malformed_session_payload_fails_closed(self):
+        for payload in ([], "not-a-session", 42, {"auth": True, "csrf": [], "nonce": "x"}):
+            with self.subTest(payload=payload):
+                token = health_auth._signer("health-session-v1").dumps(payload)
+                self.client.set_cookie(health_auth.COOKIE, token, domain="localhost")
+                self.assertEqual(self.client.get("/health-auth/").status_code, 303)
+        self.client.delete_cookie(health_auth.COOKIE, domain="localhost")
+
     def test_login_requires_csrf(self):
         self.assertEqual(self._login(csrf="invalid").status_code, 400)
 
