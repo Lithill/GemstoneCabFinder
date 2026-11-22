@@ -378,7 +378,7 @@ class HealthVaultTests(unittest.TestCase):
 
     def test_legacy_plaintext_metadata_schema_is_rejected(self):
         legacy = Path(self.tmp.name) / "legacy.db"
-        with sqlite3.connect(legacy) as conn:
+        with closing(sqlite3.connect(legacy)) as conn, conn:
             conn.execute("CREATE TABLE entries (day TEXT NOT NULL, question TEXT NOT NULL, encrypted_payload BLOB NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(day, question))")
             conn.execute("CREATE TABLE vault_meta (key TEXT PRIMARY KEY, value BLOB NOT NULL)")
             conn.execute("INSERT INTO vault_meta VALUES ('key_check', ?)", (Fernet(self.key.encode()).encrypt(b'health-vault-v1'),))
