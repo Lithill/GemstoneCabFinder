@@ -10,6 +10,7 @@ import secrets
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
+from favourite_feed.gemstone_quiz import identify as identify_quiz_gem, options as quiz_options
 
 app = Flask(__name__)
 refresh_lock = Lock()
@@ -328,13 +329,18 @@ def gemstone_quiz():
                             AND i.image_url IS NOT NULL AND i.image_url != '')
             ORDER BY l.published_at DESC, l.listing_id DESC
         """).fetchall()
+    # Only quiz titles with one recognised gemstone; do not guess from photos.
+    eligible = [(row, identify_quiz_gem(row["title"])) for row in rows]
+    rows = [(row, gem) for row, gem in eligible if gem]
     # A fresh random order per quiz, stable while navigating Previous/Next.
     rows.sort(key=lambda row: hashlib.sha256(
-        f"{seed}:{row['listing_id']}".encode("ascii")).digest())
+        f"{seed}:{row[0]['listing_id']}".encode("ascii")).digest())
     total = len(rows)
     position = min(position, max(0, total - 1))
+    item, answer = rows[position] if total else (None, None)
     return render_template("gemstone_quiz.html",
-                           item=rows[position] if total else None,
+                           item=item, answer=answer,
+                           choices=quiz_options(answer, seed, item["listing_id"]) if item else [],
                            position=position, total=total, seed=seed)
 
 
