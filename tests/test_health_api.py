@@ -89,6 +89,24 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(self.client.get("/private-health-api/checkin/2026-11-21").json["entries"], [])
 
+    def test_disabling_storage_switch_revokes_existing_api_access(self):
+        csrf = self.login()
+        endpoint = "/private-health-api/checkin/2026-11-21"
+        with patch.dict(os.environ, {"HEALTH_STAGING_STORAGE_ENABLED": "0"}):
+            self.assertEqual(self.client.get(endpoint).status_code, 404)
+            self.assertEqual(self.client.post(endpoint, json={"entries":[]},
+                                              headers={"X-Health-CSRF":csrf}).status_code, 404)
+        self.assertEqual(self.client.get(endpoint).status_code, 200)
+
+    def test_staging_path_cannot_target_production_vault(self):
+        csrf = self.login()
+        endpoint = "/private-health-api/checkin/2026-11-21"
+        for unsafe in ("health_vault.db", "favourite_feed.db"):
+            with self.subTest(path=unsafe):
+                with patch.dict(os.environ, {"HEALTH_STAGING_VAULT_PATH":str(self.path.parent / unsafe)}):
+                    self.assertEqual(self.client.post(endpoint, json={"entries":[]},
+                                                      headers={"X-Health-CSRF":csrf}).status_code, 503)
+
     def test_storage_disabled_by_default_in_preview(self):
         with patch.dict(os.environ, {"HEALTH_STAGING_STORAGE_ENABLED": "0"}):
             app = create_staging_app()
