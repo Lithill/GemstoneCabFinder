@@ -11,6 +11,7 @@ from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
 from favourite_feed.gemstone_quiz import identify as identify_quiz_gem, options as quiz_options
+from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
 app = Flask(__name__)
 refresh_lock = Lock()
@@ -339,7 +340,7 @@ def gemstone_quiz():
     position = min(position, max(0, total - 1))
     item, answer = rows[position] if total else (None, None)
     return render_template("gemstone_quiz.html",
-                           item=item, answer=answer,
+                           item=item, answer=answer, recognition_tip=GEMSTONE_TIPS.get(answer, ""),
                            choices=quiz_options(answer, seed, item["listing_id"]) if item else [],
                            position=position, total=total, seed=seed)
 
