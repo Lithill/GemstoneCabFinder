@@ -1,14 +1,40 @@
 "use strict";
-// Loaded ONLY on the double-opt-in private staging page.
-// The public prototype has no network calls and remains memory-only.
+// This client is loaded ONLY in the double-opt-in private staging tracker.
 (() => {
   const dateInput = document.getElementById("staging-day");
   if (!dateInput) return;
   const status = document.getElementById("staging-status");
-  dateInput.value = new Date().toLocaleDateString("en-CA");
+  const indicator = document.getElementById("staging-save-state");
+  const saveButton = document.getElementById("staging-save");
+  const loadButton = document.getElementById("staging-load");
+  const today = new Date();
+  dateInput.value = [today.getFullYear(), String(today.getMonth()+1).padStart(2,"0"), String(today.getDate()).padStart(2,"0")].join("-");
   let csrf = null;
   let busy = false;
+  let dirty = false;
+  let loadedDay = null;
+  let savedSnapshot = null;
+  let suppressChanges = false;
   const show = message => { status.textContent = message; };
+  const entriesForSave = () => diary.map(({name, answer, extras}) => ({name, answer, extras, notes:""}));
+  const snapshot = () => JSON.stringify(entriesForSave().slice().sort((a,b) => a.name.localeCompare(b.name)));
+  const setDirty = value => {
+    dirty = value;
+    indicator.textContent = dirty ? "Unsaved changes" : (loadedDay === dateInput.value ? "All changes saved or loaded" : "Date not loaded");
+    indicator.dataset.state = dirty ? "unsaved" : "saved";
+  };
+  const refreshDirty = () => {
+    if (!suppressChanges) setDirty(savedSnapshot === null ? diary.length > 0 : snapshot() !== savedSnapshot);
+  };
+  document.addEventListener("tracker:diary-changed", refreshDirty);
+  dateInput.addEventListener("change", () => {
+    if (busy) return;
+    if (loadedDay !== dateInput.value) {
+      savedSnapshot = null;
+      setDirty(diary.length > 0);
+      show("Different date selected. Load this day before editing or saving.");
+    }
+  });
   async function sessionToken() {
     if (csrf) return csrf;
     const response = await fetch("/private-health-api/session", {credentials:"same-origin", cache:"no-store"});
@@ -36,8 +62,9 @@
   async function run(task) {
     if (busy) return;
     busy = true;
-    document.getElementById("staging-save").disabled = true;
-    document.getElementById("staging-load").disabled = true;
+    saveButton.disabled = true;
+    loadButton.disabled = true;
+    dateInput.disabled = true;
     try {
       if (!dateInput.value) throw new Error("Choose a date first.");
       await task(dateInput.value);
@@ -45,31 +72,58 @@
       show(error.message || "The operation failed.");
     } finally {
       busy = false;
-      document.getElementById("staging-save").disabled = false;
-      document.getElementById("staging-load").disabled = false;
+      saveButton.disabled = false;
+      loadButton.disabled = false;
+      dateInput.disabled = false;
     }
   }
+  function replaceDiary(entries) {
+    suppressChanges = true;
+    try {
+      diary.splice(0, diary.length, ...entries);
+      renderDiary();
+    } finally { suppressChanges = false; }
+  }
+  function requireLoaded(day) {
+    if (loadedDay !== day) throw new Error("Load this date first to avoid mixing entries from different days.");
+  }
   window.stagingDeleteEntry = question => run(async day => {
-    if (!confirm("Permanently delete the saved answer for " + question + " on " + day + "? Older backups may still contain it.")) return;
+    requireLoaded(day);
+    if (dirty) throw new Error("Save or discard your unsaved changes before deleting a saved answer.");
+    if (!confirm("Delete the saved answer for " + question + " on " + day + "? Older backups may still contain it.")) return;
     const result = await api("delete/" + encodeURIComponent(day), "POST", {question});
     if (result.deleted) {
-      const index = diary.findIndex(entry => entry.name === question);
-      if (index >= 0) diary.splice(index, 1);
-      renderDiary();
+      replaceDiary(diary.filter(entry => entry.name !== question));
+      savedSnapshot = snapshot();
+      setDirty(false);
     }
     show(result.deleted ? "Deleted saved answer for " + question + "." : "No saved answer found for that date.");
   });
-  document.getElementById("staging-save").addEventListener("click", () => run(async day => {
-    // Notes never leave the browser; only canonical diary fields are transmitted.
-    const entries = diary.map(({name, answer, extras}) => ({name, answer, extras, notes:""}));
+  saveButton.addEventListener("click", () => run(async day => {
+    requireLoaded(day);
+    const entries = entriesForSave();
+    if (!entries.length) {
+      show("No answers to save. Use Delete saved entry to remove answers already stored.");
+      return;
+    }
     const result = await api("checkin/" + encodeURIComponent(day), "POST", {entries});
-    show("Saved " + result.saved + " entries for " + day + ". Other saved answers for this day are unchanged.");
+    savedSnapshot = snapshot();
+    setDirty(false);
+    show("Saved " + result.saved + " answers for " + day + ". Existing answers not shown here remain saved.");
   }));
-  document.getElementById("staging-load").addEventListener("click", () => run(async day => {
-    if (diary.length && !confirm("Replace your current unsaved diary with the saved entries for this date?")) return;
+  loadButton.addEventListener("click", () => run(async day => {
+    if (dirty && !confirm("Discard your unsaved changes and load the saved answers for this date?")) return;
     const result = await api("checkin/" + encodeURIComponent(day), "GET");
-    diary.splice(0, diary.length, ...result.entries);
-    renderDiary();
-    show("Loaded " + result.entries.length + " entries for " + day + ".");
+    replaceDiary(result.entries);
+    loadedDay = day;
+    savedSnapshot = snapshot();
+    setDirty(false);
+    show("Loaded " + result.entries.length + " answers for " + day + ". You can now edit and save.");
   }));
+  window.addEventListener("beforeunload", event => {
+    if (!dirty) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+  setDirty(false);
 })();
