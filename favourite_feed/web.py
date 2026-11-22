@@ -304,6 +304,32 @@ def etsy(listing_id):
             conn.execute("UPDATE listings SET seen_at=? WHERE listing_id=?", (datetime.now(timezone.utc).isoformat(),listing_id))
     return redirect(row["listing_url"], code=303)
 
+@app.get("/gemstone-quiz")
+def gemstone_quiz():
+    """Photo-first, read-only identification practice using collected Etsy images."""
+    try:
+        position = max(0, int(request.args.get("position", "0")))
+    except (TypeError, ValueError):
+        position = 0
+    with connect_database() as conn:
+        rows = conn.execute("""
+            SELECT l.listing_id, l.title, l.listing_url,
+                   (SELECT image_url FROM listing_images i
+                    WHERE i.listing_id = l.listing_id
+                    ORDER BY image_rank LIMIT 1) AS photo
+            FROM listings l
+            WHERE EXISTS (SELECT 1 FROM listing_images i
+                          WHERE i.listing_id = l.listing_id
+                            AND i.image_url IS NOT NULL AND i.image_url != '')
+            ORDER BY l.published_at DESC, l.listing_id DESC
+        """).fetchall()
+    total = len(rows)
+    position = min(position, max(0, total - 1))
+    return render_template("gemstone_quiz.html",
+                           item=rows[position] if total else None,
+                           position=position, total=total)
+
+
 @app.get("/listing/<int:listing_id>")
 def detail(listing_id):
     with connect_database() as conn:
