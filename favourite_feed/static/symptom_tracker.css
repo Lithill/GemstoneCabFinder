@@ -2,3 +2,12 @@
 .tracker-radio-group{border:0;padding:0;margin:10px 0;min-width:0}.tracker-radio-group legend{font-weight:600;margin-bottom:8px}.tracker-radio-option{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:6px 0;border:1px solid #cbd4cc;border-radius:10px;cursor:pointer;background:#fff;line-height:1.4}.tracker-radio-option:has(input:checked){background:#eaf4ec;border-color:#38654b}.tracker .tracker-radio-option input[type=radio]{width:20px;height:20px;min-width:20px;accent-color:#38654b;margin:0}.tracker-radio-option:focus-within{outline:2px solid #38654b;outline-offset:2px}
 
 .tracker-notes-toggle{display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer}.tracker .tracker-notes-toggle input[type=checkbox]{width:19px;height:19px;accent-color:#38654b}.tracker-field[hidden]{display:none!important}
+
+/* Private diary feedback remains readable on small screens. */
+.tracker-save-state{font-weight:700;padding:10px 12px;border-radius:9px;background:#edf4ef;color:#244b35}
+.tracker-save-state[data-state="unsaved"]{background:#fff3da;color:#79501c}
+#staging-storage{background:#fff;border:1px solid #d8dfd8;border-radius:16px;padding:20px}
+#staging-storage label{display:block;font-weight:600;margin:12px 0 7px}
+#staging-storage .tracker-actions button{min-height:44px;padding:10px 16px}
+.tracker-diary-item button{min-height:42px}
+@media(max-width:600px){#staging-storage{padding:16px}#staging-storage .tracker-actions{justify-content:stretch}#staging-storage .tracker-actions button{flex:1 1 100%}.tracker-diary-item{flex-wrap:wrap}}
