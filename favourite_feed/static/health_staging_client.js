@@ -7,6 +7,14 @@
   const indicator = document.getElementById("staging-save-state");
   const saveButton = document.getElementById("staging-save");
   const loadButton = document.getElementById("staging-load");
+  const modeButtons = [document.getElementById("guided-start"), document.getElementById("quick-start")];
+  const modeSections = [document.getElementById("guided"), document.getElementById("quick")];
+  function lockEditing(locked) {
+    modeButtons.forEach(button => { button.disabled = locked; });
+    modeSections.forEach(section => { if (locked) section.hidden = true; });
+    document.getElementById("clear-diary").disabled = locked;
+    saveButton.disabled = locked || busy;
+  }
   const today = new Date();
   dateInput.value = [today.getFullYear(), String(today.getMonth()+1).padStart(2,"0"), String(today.getDate()).padStart(2,"0")].join("-");
   let csrf = null;
@@ -30,9 +38,12 @@
   dateInput.addEventListener("change", () => {
     if (busy) return;
     if (loadedDay !== dateInput.value) {
-      savedSnapshot = null;
-      setDirty(diary.length > 0);
-      show("Different date selected. Load this day before editing or saving.");
+      lockEditing(true);
+      show("Date changed. Load the selected day before entering or saving answers.");
+      setDirty(dirty);
+    } else {
+      lockEditing(false);
+      setDirty(dirty);
     }
   });
   async function sessionToken() {
@@ -72,7 +83,7 @@
       show(error.message || "The operation failed.");
     } finally {
       busy = false;
-      saveButton.disabled = false;
+      lockEditing(loadedDay !== dateInput.value);
       loadButton.disabled = false;
       dateInput.disabled = false;
     }
@@ -118,6 +129,7 @@
     loadedDay = day;
     savedSnapshot = snapshot();
     setDirty(false);
+    lockEditing(false);
     show("Loaded " + result.entries.length + " answers for " + day + ". You can now edit and save.");
   }));
   window.addEventListener("beforeunload", event => {
@@ -125,5 +137,7 @@
     event.preventDefault();
     event.returnValue = "";
   });
+  lockEditing(true);
+  show("Select Load saved day to unlock the diary for this date.");
   setDirty(false);
 })();
