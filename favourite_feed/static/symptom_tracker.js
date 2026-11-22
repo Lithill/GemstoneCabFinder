@@ -114,6 +114,7 @@ function removePeriodDetails(){
 }
 function renderDiary(){
   $("entry-count").textContent=diary.length+" entries";
+  document.dispatchEvent(new Event("tracker:diary-changed"));
   $("empty-diary").hidden=diary.length>0;
   $("diary-items").replaceChildren();
   diary.forEach((item,i)=>{
