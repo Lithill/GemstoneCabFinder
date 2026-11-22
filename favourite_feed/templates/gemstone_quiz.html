@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guess the gemstone</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
+<style>
+.quiz{max-width:680px;margin:1rem auto;padding:0 1rem;text-align:center}
+.quiz-photo{display:block;width:100%;max-height:65vh;object-fit:contain;background:#f3f3f3;border-radius:14px}
+.quiz-controls{display:flex;flex-wrap:wrap;justify-content:center;gap:1rem;margin:1rem 0}
+.quiz-controls a,.quiz-controls button,.quiz summary{display:inline-block;padding:.8rem 1.1rem;border:1px solid #777;border-radius:10px;background:white;color:#111;font:inherit;cursor:pointer;text-decoration:none}
+.quiz details{margin:1rem 0;padding:1rem;border:1px solid #aaa;border-radius:12px}
+.quiz details strong{display:block;margin:1rem 0;overflow-wrap:anywhere;font-size:1.15rem}
+.quiz details[open] summary{background:#e9f3e9}
+</style>
+</head>
+<body>
+<header><h1>Guess the gemstone</h1><nav><a href="/">Gemstone feed</a><a href="/refresh">Refresh</a></nav></header>
+<main class="quiz">
+<p>Look at the photo, think of your answer, then reveal the Etsy listing title. Nothing is recorded.</p>
+{% if item %}
+<p>Photo {{ position + 1 }} of {{ total }}</p>
+<img class="quiz-photo" src="{{ item.photo }}" alt="Unlabelled gemstone listing photograph; reveal the title below" referrerpolicy="no-referrer">
+<details><summary>Reveal listing title</summary><strong>{{ item.title }}</strong>
+{% if item.listing_url and item.listing_url.startswith('https://www.etsy.com/') %}<a href="{{ item.listing_url }}" target="_blank" rel="noopener noreferrer">View on Etsy</a>{% endif %}
+<p><small>Listing titles are seller descriptions, not independently verified identifications.</small></p></details>
+<div class="quiz-controls">
+{% if position > 0 %}<a href="{{ url_for('gemstone_quiz',position=position-1) }}">← Previous photo</a>{% endif %}
+{% if position + 1 < total %}<a href="{{ url_for('gemstone_quiz',position=position+1) }}">Next photo →</a>{% else %}<a href="{{ url_for('gemstone_quiz',position=0) }}">Start again</a>{% endif %}
+</div>
+{% else %}<p>No saved gemstone photographs yet. Refresh your Etsy listings first.</p>{% endif %}
+</main>
+</body></html>
