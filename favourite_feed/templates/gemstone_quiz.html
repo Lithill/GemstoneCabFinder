@@ -23,6 +23,8 @@
 #answer-panel h2{font-size:1.6rem;margin:0}
 #feedback{font-weight:bold;font-size:1.2rem;margin:0}
 #listing-title{overflow-wrap:anywhere}
+#recognition-tip{text-align:left;line-height:1.55;background:#fff;padding:1rem;border-radius:10px;border:1px solid #ddd}
+#recognition-tip[hidden]{display:none}
 @media(max-width:420px){.choices{grid-template-columns:1fr}}
 </style>
 </head>
@@ -36,6 +38,7 @@
 <section id="answer-panel" hidden aria-live="polite">
 <p id="feedback" role="status"></p>
 <h2>{{ answer }}</h2>
+{% if recognition_tip %}<div id="recognition-tip" hidden><strong>How to recognise it</strong><p>{{ recognition_tip }}</p><small>Visual clues are guides, not proof of identification from a photo.</small></div>{% endif %}
 <p id="listing-title"><strong>Etsy listing title:</strong> {{ item.title }}</p>
 {% if item.listing_url and item.listing_url.startswith('https://www.etsy.com/') %}<p><a href="{{ item.listing_url }}" target="_blank" rel="noopener noreferrer">View on Etsy</a></p>{% endif %}
 <small>Seller's identification; not independently verified.</small>
@@ -53,6 +56,7 @@ const feedback = document.getElementById('feedback');
 const answerPanel = document.getElementById('answer-panel');
 const photo = document.getElementById('quiz-photo');
 const choices = document.querySelector('.choices');
+const recognitionTip = document.getElementById('recognition-tip');
 buttons.forEach(button => button.addEventListener('click', () => {
   if (buttons.some(b => b.disabled)) return;
   const correct = button.dataset.correct === 'yes';
@@ -65,6 +69,7 @@ buttons.forEach(button => button.addEventListener('click', () => {
   photo.hidden = true;
   choices.hidden = true;
   answerPanel.hidden = false;
+  if (!correct && recognitionTip) recognitionTip.hidden = false;
 }));
 </script>
 </body></html>
