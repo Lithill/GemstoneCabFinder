@@ -5,6 +5,8 @@ from favourite_feed.database import connect_database, setup_database
 from favourite_feed.filters import is_visible, DEFAULT_EXCLUSIONS, DEFAULT_PREFERENCES
 import json
 from threading import Lock
+import hashlib
+import secrets
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
@@ -311,6 +313,9 @@ def gemstone_quiz():
         position = max(0, int(request.args.get("position", "0")))
     except (TypeError, ValueError):
         position = 0
+    seed = request.args.get("seed", "")
+    if not (len(seed) == 16 and all(c in "0123456789abcdef" for c in seed)):
+        seed = secrets.token_hex(8)
     with connect_database() as conn:
         rows = conn.execute("""
             SELECT l.listing_id, l.title, l.listing_url,
@@ -323,11 +328,14 @@ def gemstone_quiz():
                             AND i.image_url IS NOT NULL AND i.image_url != '')
             ORDER BY l.published_at DESC, l.listing_id DESC
         """).fetchall()
+    # A fresh random order per quiz, stable while navigating Previous/Next.
+    rows.sort(key=lambda row: hashlib.sha256(
+        f"{seed}:{row['listing_id']}".encode("ascii")).digest())
     total = len(rows)
     position = min(position, max(0, total - 1))
     return render_template("gemstone_quiz.html",
                            item=rows[position] if total else None,
-                           position=position, total=total)
+                           position=position, total=total, seed=seed)
 
 
 @app.get("/listing/<int:listing_id>")
