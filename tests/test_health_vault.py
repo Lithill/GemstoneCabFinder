@@ -3,6 +3,7 @@
 No live health data, server configuration, or production database is used.
 """
 import os
+from contextlib import closing
 import json
 import sqlite3
 from pathlib import Path
@@ -64,7 +65,7 @@ class HealthVaultTests(unittest.TestCase):
 
     def _synthetic_unverified_backup(self, destination):
         """Create deliberately damaged test fixtures without using production backup."""
-        with sqlite3.connect(self.db) as source:
+        with closing(sqlite3.connect(self.db)) as source, source:
             snapshot = sqlite3.connect(":memory:")
             try:
                 source.backup(snapshot)
@@ -78,7 +79,7 @@ class HealthVaultTests(unittest.TestCase):
         health_vault.put("2026-11-21", "Anxiety", {"answer": "None"}, self.db)
         self.assertEqual(health_vault.get("2026-11-20", "Anxiety", self.db), {"answer": "Severe"})
         self.assertEqual(health_vault.get("2026-11-21", "Anxiety", self.db), {"answer": "None"})
-        with health_vault._connect(self.db) as conn:
+        with closing(health_vault._connect(self.db)) as conn, conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0], 2)
             self.assertNotIn(b"Severe", conn.execute("SELECT encrypted_payload FROM entries LIMIT 1").fetchone()[0])
             self.assertEqual([column[1] for column in conn.execute("PRAGMA table_info(entries)")], ["entry_id", "encrypted_payload"])
@@ -143,7 +144,7 @@ class HealthVaultTests(unittest.TestCase):
                     + raw_answer + "}"
                 ).encode()
                 payload = Fernet(self.key.encode()).encrypt(plaintext)
-                with sqlite3.connect(self.db) as conn:
+                with closing(sqlite3.connect(self.db)) as conn, conn:
                     conn.execute("INSERT OR REPLACE INTO entries VALUES (?, ?)",
                                  (health_vault._entry_id(day, question), payload))
                 backup = Path(self.tmp.name) / ("oversized.enc" if len(raw_answer) > 1000 else "nan.enc")
@@ -165,7 +166,7 @@ class HealthVaultTests(unittest.TestCase):
         payload = Fernet(self.key.encode()).encrypt(json.dumps({
             "day": day, "question": question, "answer": {"answer": "Mild"}
         }).encode())
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute("INSERT INTO entries VALUES (?, ?)",
                          (health_vault._entry_id(day, question), payload))
         backup = Path(self.tmp.name) / "invalid-date.enc"
@@ -183,7 +184,7 @@ class HealthVaultTests(unittest.TestCase):
     def test_backup_with_tampered_encrypted_entry_is_rejected(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         # Change an encrypted record while keeping the SQLite file structurally valid.
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute("UPDATE entries SET encrypted_payload=?",
                          (b"not-a-valid-fernet-token",))
         backup = Path(self.tmp.name) / "tampered-entry.enc"
@@ -200,7 +201,7 @@ class HealthVaultTests(unittest.TestCase):
 
     def test_backup_with_mismatched_secret_entry_id_is_rejected(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute("UPDATE entries SET entry_id=?", ("0" * 64,))
         backup = Path(self.tmp.name) / "mismatched-entry.enc"
         with self.assertRaises(RuntimeError):
