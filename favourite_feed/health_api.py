@@ -6,7 +6,7 @@ Do not enable on production before privacy/security review and explicit approval
 import os
 from pathlib import Path
 
-from flask import Blueprint, abort, jsonify, make_response, request
+from flask import Blueprint, abort, jsonify, request
 
 from favourite_feed.health_auth import _valid_session, health_csrf_required
 from favourite_feed.health_diary_bridge import read_diary_offline, save_diary_offline
@@ -20,13 +20,21 @@ def _vault_path():
     if not configured:
         abort(503)
     path = Path(configured).expanduser()
-    if path.name == "favourite_feed.db":
+    # Staging vaults must live outside the repository and use a distinct name.
+    # Do not allow configuration to point at the production gemstone DB or at
+    # the default health vault reserved for future approved production use.
+    from favourite_feed.health_vault import DEFAULT_PATH
+    if (path.name in {"favourite_feed.db", "health_vault.db"}
+            or path.resolve() == DEFAULT_PATH.resolve()
+            or path.is_symlink()):
         abort(503)
     return path
 
 
 @health_api.before_request
 def require_private_session():
+    if os.environ.get("HEALTH_STAGING_STORAGE_ENABLED") != "1":
+        abort(404)
     if not _valid_session():
         abort(401)
     if request.method != "GET":
