@@ -30,6 +30,25 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         app.config.update(TESTING=True, SERVER_NAME="localhost")
         self.client = app.test_client()
 
+    def test_private_diary_controls_are_only_present_in_storage_staging(self):
+        from pathlib import Path
+        with patch.dict(os.environ, {"HEALTH_STAGING_STORAGE_ENABLED": "1"}):
+            with self.client.application.test_request_context("/private-symptom-tracker"):
+                html = render_template("symptom_tracker.html", private_preview=True, storage_staging=True)
+        self.assertIn('id="staging-day"', html)
+        self.assertIn('id="staging-save-state"', html)
+        self.assertIn("Save my day", html)
+        self.assertIn("health_staging_client.js", html)
+        with self.client.application.test_request_context("/symptom-tracker"):
+            public_html = render_template("symptom_tracker.html")
+        self.assertNotIn('id="staging-day"', public_html)
+        self.assertNotIn("health_staging_client.js", public_html)
+        client_script = (Path(__file__).resolve().parents[1] / "favourite_feed" / "static" / "health_staging_client.js").read_text()
+        self.assertIn('requireLoaded(day)', client_script)
+        self.assertIn('beforeunload', client_script)
+        self.assertIn('tracker:diary-changed', client_script)
+        self.assertIn('notes:""', client_script)
+
     def test_public_prototype_navigation_remains_unchanged(self):
         with self.client.application.test_request_context("/symptom-tracker"):
             html = render_template("symptom_tracker.html")
