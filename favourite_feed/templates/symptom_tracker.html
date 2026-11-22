@@ -5,7 +5,11 @@
 <link rel="stylesheet" href="{{ url_for('static',filename='symptom_tracker.css') }}"></head>
 <body><header><h1>Perimenopause tracker</h1><nav>{% if private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
+{% if storage_staging %}
+<div class="tracker-warning"><strong>Private test diary — fictional information only.</strong> Load a date before entering answers. Nothing is stored until you choose Save check-in. Free-text notes are not stored.</div>
+{% else %}
 <div class="tracker-warning"><strong>Design preview only — nothing is saved.</strong> Answers stay on this page temporarily. Leaving or refreshing clears them. Do not enter identifying or sensitive notes during testing.</div>
+{% endif %}
 <h2>How would you like to check in?</h2>
 <div class="tracker-choices">
 <button type="button" id="guided-start" class="tracker-choice"><strong>Guided check-in</strong><span>Go through every question, one by one. Skip any question.</span></button>
@@ -24,28 +28,29 @@
 <div id="quick-category" role="group" aria-label="Category"></div>
 <div id="quick-symptom" role="group" aria-label="Symptom or measurement"></div>
 <div id="quick-fields"></div>
-<button type="button" id="quick-add" class="tracker-primary">Add to preview diary</button>
+<button type="button" id="quick-add" class="tracker-primary">{% if storage_staging %}Add to today’s diary{% else %}Add to preview diary{% endif %}</button>
 </section>
 {% if storage_staging %}
 <section id="staging-storage" aria-label="Private staging check-ins">
-<h2>Private staging check-in</h2>
-<p>Test environment only. Entries are not saved until you select Save check-in. Notes are never sent or stored.</p>
+<h2>My daily check-in</h2>
+<p>Choose a date, then select Load saved day to begin. You can revisit and edit earlier check-ins. This is still a fictional-data test environment.</p>
 <label for="staging-day">Check-in date</label>
 <input id="staging-day" type="date" required>
 <div class="tracker-actions">
 <button type="button" id="staging-load">Load saved day</button>
-<button type="button" id="staging-save" class="tracker-primary">Save check-in</button>
+<button type="button" id="staging-save" class="tracker-primary">Save my day</button>
 </div>
+<p id="staging-save-state" class="tracker-save-state" role="status" aria-live="polite">Date not loaded</p>
 <p id="staging-status" role="status" aria-live="polite"></p>
 </section>
 {% endif %}
 <section id="summary" class="tracker-summary" aria-live="polite">
-<h2>Preview diary <small id="entry-count">0 entries</small></h2>
-<p id="empty-diary">Your temporary entries will appear here. No data is stored.</p>
+<h2>{% if storage_staging %}My diary{% else %}Preview diary{% endif %} <small id="entry-count">0 entries</small></h2>
+<p id="empty-diary">{% if storage_staging %}Your entries for the selected date will appear here after loading.{% else %}Your temporary entries will appear here. No data is stored.{% endif %}</p>
 <div id="diary-items"></div>
-<button type="button" id="clear-diary">Clear preview entries</button>
+<button type="button" id="clear-diary">{% if storage_staging %}Clear on-screen entries (does not delete saved answers){% else %}Clear preview entries{% endif %}</button>
 </section>
-<p class="tracker-footnote">This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.</p>
+<p class="tracker-footnote">{% if storage_staging %}Private test mode. Saved answers are encrypted; free-text notes are never transmitted or saved. Removing an on-screen entry does not delete a previously saved answer. This is not a medical record or diagnostic tool.{% else %}This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.{% endif %}</p>
 </main>
 <script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_staging_client.js') }}" defer></script>{% endif %}
