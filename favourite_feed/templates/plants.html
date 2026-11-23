@@ -73,64 +73,43 @@
 <p class="note">Care tips are general guidance. Check the actual compost and roots before deciding to water; wilting can happen from both drought and root rot.</p>
 </main>
 <script>
-/* Load real plant photos from Wikipedia, falling back to Wikimedia Commons. */
+/* Independent per-plant thumbnail requests avoid one failed batch hiding all photos. */
 const wikiTitles = {
-"Money tree":"Pachira aquatica","Button fern":"Pellaea rotundifolia",
-"Christmas cactus":"Schlumbergera truncata","Fishbone cactus":"Disocactus anguliger",
-"Golden pothos":"Epipremnum aureum","Grape ivy":"Cissus rhombifolia",
-"Jade plant":"Crassula ovata","Kimberley queen fern":"Nephrolepis obliterata",
-"Lipstick plant":"Aeschynanthus radicans","Mother-in-law's tongue":"Dracaena trifasciata",
-"Oxalis triangularis":"Oxalis triangularis","Parlour palm":"Chamaedorea elegans",
-"Porcelain plant (Hoya)":"Hoya carnosa","Rattlesnake plant":"Goeppertia insignis",
-"Silver inch plant":"Tradescantia zebrina","String of hearts":"Ceropegia woodii",
-"Cape sundew":"Drosera capensis"
+"Money tree":"Pachira_aquatica","Button fern":"Pellaea_rotundifolia",
+"Christmas cactus":"Schlumbergera_truncata","Fishbone cactus":"Disocactus_anguliger",
+"Golden pothos":"Epipremnum_aureum","Grape ivy":"Cissus_rhombifolia",
+"Jade plant":"Crassula_ovata","Kimberley queen fern":"Nephrolepis_obliterata",
+"Lipstick plant":"Aeschynanthus_radicans","Mother-in-law's tongue":"Dracaena_trifasciata",
+"Oxalis triangularis":"Oxalis_triangularis","Parlour palm":"Chamaedorea_elegans",
+"Porcelain plant (Hoya)":"Hoya_carnosa","Rattlesnake plant":"Goeppertia_insignis",
+"Silver inch plant":"Tradescantia_zebrina","String of hearts":"Ceropegia_woodii",
+"Cape sundew":"Drosera_capensis"
 };
-const tiles = Array.from(document.querySelectorAll(".plant-photo"));
-const titles = [...new Set(tiles.map(t => wikiTitles[t.dataset.species]).filter(Boolean))];
-function setPhoto(tile, url) {
- if (!url || !url.startsWith("https://upload.wikimedia.org/")) return false;
+async function photoFor(tile) {
+ const title = wikiTitles[tile.dataset.species];
+ if (!title) return;
  const img = document.createElement("img");
  img.alt = tile.dataset.species + " plant";
  img.loading = "lazy";
  img.referrerPolicy = "no-referrer";
- img.addEventListener("load", () => tile.replaceChildren(img), {once:true});
- img.src = url;
- return true;
-}
-async function commonsFallback(tile) {
- const species = wikiTitles[tile.dataset.species];
- if (!species) return;
+ img.onload = () => tile.replaceChildren(img);
+ img.onerror = () => { img.remove(); };
  try {
-  const params = new URLSearchParams({action:"query",format:"json",origin:"*",generator:"search",
-   gsrsearch:"filetype:bitmap " + species,gsrnamespace:"6",gsrlimit:"8",
-   prop:"imageinfo",iiprop:"url|mime",iiurlwidth:"350"});
-  const response = await fetch("https://commons.wikimedia.org/w/api.php?" + params);
-  if (!response.ok) return;
+  const response = await fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title),
+   {mode:"cors",credentials:"omit"});
+  if (!response.ok) throw new Error("No Wikipedia summary");
   const data = await response.json();
-  const pages = Object.values(data.query?.pages || {});
-  const match = pages.find(p => p.title.toLowerCase().includes(species.toLowerCase()) &&
-   p.imageinfo?.[0]?.mime?.startsWith("image/") && p.imageinfo[0].thumburl);
-  if (match) setPhoto(tile, match.imageinfo[0].thumburl);
- } catch (_) { /* Keep the leaf placeholder if offline. */ }
-}
-(async () => {
- let urls = {};
- try {
-  const params = new URLSearchParams({action:"query",format:"json",origin:"*",prop:"pageimages",
-   piprop:"thumbnail",pithumbsize:"350",redirects:"1",titles:titles.join("|")});
-  const response = await fetch("https://en.wikipedia.org/w/api.php?" + params);
-  if (response.ok) {
-   const data = await response.json();
-   for (const page of Object.values(data.query?.pages || {})) {
-    if (page.thumbnail?.source) urls[page.title.toLowerCase()] = page.thumbnail.source;
-   }
+  const url = data.thumbnail?.source || data.originalimage?.source;
+  if (url && new URL(url).protocol === "https:") {
+   img.src = url;
+   return;
   }
  } catch (_) {}
- for (const tile of tiles) {
-  if (!setPhoto(tile, urls[(wikiTitles[tile.dataset.species] || "").toLowerCase()])) {
-   commonsFallback(tile);
-  }
+ /* Direct Wikimedia Commons file redirect for a known public-domain button fern photo. */
+ if (title === "Pellaea_rotundifolia") {
+  img.src = "https://commons.wikimedia.org/wiki/Special:Redirect/file/Pellaearotundifolium.jpg?width=350";
  }
-})();
+}
+document.querySelectorAll(".plant-photo").forEach(photoFor);
 </script>
 </body></html>
