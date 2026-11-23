@@ -1,5 +1,5 @@
 """Separate houseplant diary; gemstone database remains untouched."""
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from functools import wraps
 import os
 from pathlib import Path
@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 
 from flask import Blueprint, abort, redirect, render_template, request, url_for
 from favourite_feed.plant_collection import INITIAL_CARE, INITIAL_PLANTS
+from favourite_feed.plant_watering_guides import CHECK_INTERVALS
 
 plants = Blueprint("plants", __name__)
 DB_PATH = Path.home() / ".gemstonecabfinder-private" / "plants.db"
@@ -76,7 +77,41 @@ def index():
     with closing(connection()) as conn:
         entries = conn.execute("""SELECT p.*, (SELECT MAX(watered_on) FROM plant_watering w WHERE w.plant_id=p.id) AS last_watered
                                   FROM houseplants p ORDER BY p.name COLLATE NOCASE, p.id""").fetchall()
-    return render_template("plants.html", entries=entries, care=CARE, species=list(CARE), today=date.today().isoformat())
+    today = date.today()
+    season = "spring/summer" if 4 <= today.month <= 9 else "autumn/winter"
+    with closing(connection()) as conn:
+        setting = conn.execute("SELECT value FROM plant_metadata WHERE key='room_temperature'").fetchone()
+    temperature = setting["value"] if setting and setting["value"] in ("cool", "normal", "warm") else "normal"
+    guides = {}
+    for plant in entries:
+        days_since = (today - date.fromisoformat(plant["last_watered"])).days if plant["last_watered"] else None
+        interval = CHECK_INTERVALS.get(plant["species"])
+        if interval:
+            lower, upper = interval[:2] if season == "spring/summer" else interval[2:]
+            if temperature == "cool":
+                lower, upper = round(lower * 1.3), round(upper * 1.3)
+            elif temperature == "warm":
+                lower, upper = max(1, round(lower * 0.75)), max(1, round(upper * 0.75))
+            guidance = f"Check moisture roughly every {lower}–{upper} days"
+            if plant["species"] == "Cape sundew":
+                guidance = "Check the water tray daily or every other day; keep its compost wet"
+        else:
+            guidance = "Check soil moisture regularly; no species-specific interval yet"
+        guides[plant["id"]] = {"days_since": days_since, "guidance": guidance}
+    return render_template("plants.html", entries=entries, care=CARE, species=list(CARE),
+                           today=today.isoformat(), season=season, temperature=temperature, guides=guides)
+
+
+@plants.post("/plants/temperature")
+@protected
+def set_temperature():
+    value = request.form.get("temperature")
+    if value not in ("cool", "normal", "warm"):
+        abort(400)
+    with closing(connection()) as conn:
+        with conn:
+            conn.execute("INSERT OR REPLACE INTO plant_metadata(key,value) VALUES ('room_temperature',?)", (value,))
+    return redirect(url_for("plants.index"), code=303)
 
 
 @plants.post("/plants/add")
