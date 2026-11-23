@@ -7,6 +7,15 @@
 .plants input,.plants select,.plants textarea,.plants button{font:inherit;padding:.65rem;border-radius:8px;max-width:100%}
 .plants input,.plants select,.plants textarea{border:1px solid #888}.plants button{cursor:pointer}
 .add-plant{display:grid;gap:.7rem;max-width:520px}.add-plant label{display:grid;gap:.3rem}
+.plant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin:1rem 0}
+@media(min-width:650px){.plant-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:900px){.plant-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.plant-tile{display:block;text-align:center;text-decoration:none;color:inherit;border:1px solid #bbb;border-radius:12px;overflow:hidden;background:#fff}
+.plant-tile:focus-visible{outline:3px solid #167b4c;outline-offset:2px}
+.plant-photo{height:145px;display:flex;align-items:center;justify-content:center;background:#e9f2e9;font-size:3rem;overflow:hidden}
+.plant-photo img{height:100%;width:100%;object-fit:cover}
+.plant-tile-name{display:block;padding:.65rem .3rem;font-weight:700}
+.plant-card{scroll-margin-top:1rem}
 .note{color:#555}.plant-card details{margin:.7rem 0}.plant-card summary{cursor:pointer;font-weight:bold}
 </style></head><body>
 <header><h1>🌿 Houseplant care</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone feed</a></nav></header>
@@ -33,8 +42,17 @@
 <button type="submit">Add plant</button>
 </form></section>
 <section><h2>My plants ({{ entries|length }})</h2>
+<p>Tap a plant picture to jump to its watering and care details. Plants are sorted A–Z.</p>
+<div class="plant-grid">
 {% for plant in entries %}
-<article class="plant-card">
+<a class="plant-tile" href="#plant-{{ plant.id }}">
+<span class="plant-photo" data-species="{{ plant.species }}" role="img" aria-label="Picture of {{ plant.species }}">🌿</span>
+<span class="plant-tile-name">{{ plant.name }}</span>
+</a>
+{% endfor %}
+</div>
+{% for plant in entries %}
+<article class="plant-card" id="plant-{{ plant.id }}">
 <h2>{{ plant.name }}</h2><p class="note">{{ plant.species }}</p>
 <p><strong>Last watered:</strong> {{ plant.last_watered or 'Not recorded yet' }}{% if guides[plant.id].days_since is not none %} ({{ guides[plant.id].days_since }} day{% if guides[plant.id].days_since != 1 %}s{% endif %} ago){% endif %}</p>
 <p><strong>When to check:</strong> {{ guides[plant.id].guidance }}.</p>
@@ -53,4 +71,42 @@
 {% else %}<p>No plants added yet. Start with one above.</p>{% endfor %}
 </section>
 <p class="note">Care tips are general guidance. Check the actual compost and roots before deciding to water; wilting can happen from both drought and root rot.</p>
-</main></body></html>
+</main>
+<script>
+/* Wikipedia/Wikimedia plant photographs: load only available thumbnails, with leaf fallback. */
+const wikiTitles = {
+"Money tree":"Pachira aquatica","Button fern":"Pellaea rotundifolia",
+"Christmas cactus":"Schlumbergera truncata","Fishbone cactus":"Disocactus anguliger",
+"Golden pothos":"Epipremnum aureum","Grape ivy":"Cissus rhombifolia",
+"Jade plant":"Crassula ovata","Kimberley queen fern":"Nephrolepis obliterata",
+"Lipstick plant":"Aeschynanthus radicans","Mother-in-law's tongue":"Dracaena trifasciata",
+"Oxalis triangularis":"Oxalis triangularis","Parlour palm":"Chamaedorea elegans",
+"Porcelain plant (Hoya)":"Hoya carnosa","Rattlesnake plant":"Goeppertia insignis",
+"Silver inch plant":"Tradescantia zebrina","String of hearts":"Ceropegia woodii",
+"Cape sundew":"Drosera capensis"
+};
+const tiles = Array.from(document.querySelectorAll(".plant-photo"));
+const titles = [...new Set(tiles.map(t => wikiTitles[t.dataset.species]).filter(Boolean))];
+if (titles.length) {
+ const params = new URLSearchParams({action:"query",format:"json",origin:"*",prop:"pageimages",piprop:"thumbnail",pithumbsize:"350",redirects:"1",titles:titles.join("|")});
+ fetch("https://en.wikipedia.org/w/api.php?" + params.toString())
+  .then(r => {if (!r.ok) throw new Error("Image service unavailable"); return r.json();})
+  .then(data => {
+   const urls = {};
+   for (const page of Object.values(data.query?.pages || {})) {
+    if (page.thumbnail?.source) urls[page.title.toLowerCase()] = page.thumbnail.source;
+   }
+   for (const tile of tiles) {
+    const url = urls[(wikiTitles[tile.dataset.species] || "").toLowerCase()];
+    if (!url) continue;
+    const img = document.createElement("img");
+    img.alt = tile.dataset.species;
+    img.loading = "lazy";
+    img.referrerPolicy = "no-referrer";
+    img.addEventListener("load", () => tile.replaceChildren(img), {once:true});
+    img.src = url;
+   }
+  }).catch(() => {});
+}
+</script>
+</body></html>
