@@ -12,6 +12,19 @@
 <header><h1>🌿 Houseplant care</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone feed</a></nav></header>
 <main class="plants">
 <p>Water when your plant and compost need it, not because a calendar says so. Last-watered dates are a record, <strong>not a watering reminder</strong>.</p>
+<section class="plant-card">
+<h2>Season and home temperature</h2>
+<p><strong>Current season:</strong> {{ season|capitalize }} (UK calendar approximation)</p>
+<form method="post" action="{{ url_for('plants.set_temperature') }}">
+<label>Typical room temperature
+<select name="temperature">
+<option value="cool" {% if temperature == 'cool' %}selected{% endif %}>Cool — below 18°C</option>
+<option value="normal" {% if temperature == 'normal' %}selected{% endif %}>Normal — 18–22°C</option>
+<option value="warm" {% if temperature == 'warm' %}selected{% endif %}>Warm — above 22°C</option>
+</select></label><button type="submit">Save temperature</button>
+</form>
+<p class="note">These are rough soil-check intervals, not watering deadlines. Light, pot size, compost and heating matter too. The temperature setting is remembered.</p>
+</section>
 <section><h2>Add a plant</h2>
 <form class="add-plant" method="post" action="{{ url_for('plants.add') }}">
 <label>What do you call it?<input name="name" maxlength="100" required placeholder="e.g. Living room monstera"></label>
@@ -23,7 +36,8 @@
 {% for plant in entries %}
 <article class="plant-card">
 <h2>{{ plant.name }}</h2><p class="note">{{ plant.species }}</p>
-<p><strong>Last watered:</strong> {{ plant.last_watered or 'Not recorded yet' }}</p>
+<p><strong>Last watered:</strong> {{ plant.last_watered or 'Not recorded yet' }}{% if guides[plant.id].days_since is not none %} ({{ guides[plant.id].days_since }} day{% if guides[plant.id].days_since != 1 %}s{% endif %} ago){% endif %}</p>
+<p><strong>When to check:</strong> {{ guides[plant.id].guidance }}.</p>
 {% if plant.notes %}<p>{{ plant.notes }}</p>{% endif %}
 <details open><summary>How to tell when it needs water</summary><p>{{ care[plant.species][0] }}</p></details>
 <details><summary>Problem signs to look for</summary><p>{{ care[plant.species][1] }}</p></details>
