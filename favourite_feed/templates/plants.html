@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Houseplant care</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
+<style>
+.plants{max-width:860px;margin:auto;padding:1rem}.plant-card{border:1px solid #bbb;border-radius:14px;padding:1rem;margin:1rem 0}
+.plant-card h2{margin:.2rem 0}.plant-card p{line-height:1.5}.plant-card form{display:inline-flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0}
+.plants input,.plants select,.plants textarea,.plants button{font:inherit;padding:.65rem;border-radius:8px;max-width:100%}
+.plants input,.plants select,.plants textarea{border:1px solid #888}.plants button{cursor:pointer}
+.add-plant{display:grid;gap:.7rem;max-width:520px}.add-plant label{display:grid;gap:.3rem}
+.note{color:#555}.plant-card details{margin:.7rem 0}.plant-card summary{cursor:pointer;font-weight:bold}
+</style></head><body>
+<header><h1>🌿 Houseplant care</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone feed</a></nav></header>
+<main class="plants">
+<p>Water when your plant and compost need it, not because a calendar says so. Last-watered dates are a record, <strong>not a watering reminder</strong>.</p>
+<section><h2>Add a plant</h2>
+<form class="add-plant" method="post" action="{{ url_for('plants.add') }}">
+<label>What do you call it?<input name="name" maxlength="100" required placeholder="e.g. Living room monstera"></label>
+<label>Plant type<select name="species" required>{% for type in species %}<option value="{{ type }}">{{ type }}</option>{% endfor %}</select></label>
+<label>Optional notes<textarea name="notes" maxlength="1000" rows="2" placeholder="Window, pot, soil, or anything useful"></textarea></label>
+<button type="submit">Add plant</button>
+</form></section>
+<section><h2>My plants ({{ entries|length }})</h2>
+{% for plant in entries %}
+<article class="plant-card">
+<h2>{{ plant.name }}</h2><p class="note">{{ plant.species }}</p>
+<p><strong>Last watered:</strong> {{ plant.last_watered or 'Not recorded yet' }}</p>
+{% if plant.notes %}<p>{{ plant.notes }}</p>{% endif %}
+<details open><summary>How to tell when it needs water</summary><p>{{ care[plant.species][0] }}</p></details>
+<details><summary>Problem signs to look for</summary><p>{{ care[plant.species][1] }}</p></details>
+<details><summary>How to keep it healthier</summary><p>{{ care[plant.species][2] }}</p></details>
+<form method="post" action="{{ url_for('plants.water',plant_id=plant.id) }}">
+<label>Watered on <input type="date" name="watered_on" value="{{ today }}" max="{{ today }}" required></label>
+<button type="submit">Record watering</button>
+</form>
+<details><summary>Remove this plant</summary>
+<form method="post" action="{{ url_for('plants.delete',plant_id=plant.id) }}" onsubmit="return confirm('Remove this plant and its watering history?')"><button type="submit">Delete plant and history</button></form>
+</details>
+</article>
+{% else %}<p>No plants added yet. Start with one above.</p>{% endfor %}
+</section>
+<p class="note">Care tips are general guidance. Check the actual compost and roots before deciding to water; wilting can happen from both drought and root rot.</p>
+</main></body></html>
