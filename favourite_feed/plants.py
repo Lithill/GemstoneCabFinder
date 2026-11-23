@@ -74,7 +74,7 @@ def index():
     with closing(connection()) as conn:
         entries = conn.execute("""SELECT p.*, (SELECT MAX(watered_on) FROM plant_watering w WHERE w.plant_id=p.id) AS last_watered
                                   FROM houseplants p ORDER BY p.name COLLATE NOCASE, p.id""").fetchall()
-    return render_template("plants.html", entries=entries, care=CARE, species=list(CARE))
+    return render_template("plants.html", entries=entries, care=CARE, species=list(CARE), today=date.today().isoformat())
 
 
 @plants.post("/plants/add")
