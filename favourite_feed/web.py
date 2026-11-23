@@ -14,6 +14,8 @@ from favourite_feed.gemstone_quiz import identify as identify_quiz_gem, options 
 from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
 app = Flask(__name__)
+from favourite_feed.plants import plants as plants_blueprint
+app.register_blueprint(plants_blueprint)
 refresh_lock = Lock()
 
 # Opt-in private preview only; disabled on the live installation by default.
