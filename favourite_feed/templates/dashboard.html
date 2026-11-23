@@ -12,6 +12,13 @@
 <p class="dashboard-refresh"><strong>Refresh:</strong> {% if refresh_status.status == 'never' %}Not yet recorded{% else %}{{ refresh_status.status|capitalize }} · {{ refresh_status.done }}/{{ refresh_status.total }} shops{% if refresh_status.finished_at %}<span> · <time id="finished" datetime="{{ refresh_status.finished_at }}"></time></span>{% endif %}{% endif %}</p>
 <div class="dashboard-links"><a class="dashboard-primary" href="/">Open feed</a><a href="/?view=swipe">Swipe</a><a href="/refresh">Refresh shops</a></div>
 </article>
+<article class="dashboard-card">
+<div class="dashboard-symbol" aria-hidden="true">🌿</div>
+<h2>Houseplant Care</h2>
+<p>Keep a private list of your plants, learn how to check for thirst and warning signs, and remember when you last watered each one.</p>
+<p class="dashboard-note">Water by checking the plant and compost, not a fixed schedule. Private login required.</p>
+<div class="dashboard-links"><a class="dashboard-primary" href="/plants">Open plant diary</a></div>
+</article>
 <article class="dashboard-card dashboard-coming">
 <div class="dashboard-symbol" aria-hidden="true">🧙‍♀️</div>
 <h2>Symptom Tracker <small>Design preview</small></h2>
