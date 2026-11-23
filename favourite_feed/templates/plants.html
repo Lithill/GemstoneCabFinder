@@ -42,11 +42,30 @@
 <button type="submit">Add plant</button>
 </form></section>
 <section><h2>My plants ({{ entries|length }})</h2>
-<p>Tap a plant picture to jump to its watering and care details. Plants are sorted A–Z.</p><p class="note">Photos are reference pictures from Wikipedia or Wikimedia Commons, not photos of your own plants. Image credits and licences are available from the <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a> source.</p>
+<p>Tap a plant picture to jump to its watering and care details. Plants are sorted A–Z.</p><p class="note">Plant photographs from your supplied collection.</p>
+{% set photo_files = {
+"Money tree":"money-tree.jpg",
+"Button fern":"button-fern.jpg",
+"Christmas cactus":"christmas-cactus.jpg",
+"Fishbone cactus":"fishbone-cactus.jpg",
+"Golden pothos":"golden-pothos.jpg",
+"Grape ivy":"grape-ivy.jpg",
+"Jade plant":"jade-plant.jpg",
+"Kimberley queen fern":"kimberley-queen-fern.jpg",
+"Lipstick plant":"lipstick-plant.jpg",
+"Mother-in-law's tongue":"mother-in-laws-tongue.jpg",
+"Oxalis triangularis":"oxalis-triangularis.jpg",
+"Parlour palm":"parlour-palm.jpg",
+"Porcelain plant (Hoya)":"porcelain-plant-hoya.jpg",
+"Rattlesnake plant":"rattlesnake-plant.jpg",
+"Silver inch plant":"silver-inch-plant.jpg",
+"String of hearts":"string-of-hearts.jpg",
+"Cape sundew":"cape-sundew.jpg"
+} %}
 <div class="plant-grid">
 {% for plant in entries %}
 <a class="plant-tile" href="#plant-{{ plant.id }}">
-<span class="plant-photo" data-species="{{ plant.species }}" role="img" aria-label="Picture of {{ plant.species }}">🌿</span>
+<span class="plant-photo" role="img" aria-label="Picture of {{ plant.species }}"><img src="{{ url_for('static', filename='plants/' ~ photo_files[plant.species]) }}" alt="{{ plant.species }} plant" loading="lazy" onerror="this.hidden=true;this.parentNode.append('🌿')"></span>
 <span class="plant-tile-name">{{ plant.name }}</span>
 </a>
 {% endfor %}
@@ -72,44 +91,4 @@
 </section>
 <p class="note">Care tips are general guidance. Check the actual compost and roots before deciding to water; wilting can happen from both drought and root rot.</p>
 </main>
-<script>
-/* Independent per-plant thumbnail requests avoid one failed batch hiding all photos. */
-const wikiTitles = {
-"Money tree":"Pachira_aquatica","Button fern":"Pellaea_rotundifolia",
-"Christmas cactus":"Schlumbergera_truncata","Fishbone cactus":"Disocactus_anguliger",
-"Golden pothos":"Epipremnum_aureum","Grape ivy":"Cissus_rhombifolia",
-"Jade plant":"Crassula_ovata","Kimberley queen fern":"Nephrolepis_obliterata",
-"Lipstick plant":"Aeschynanthus_radicans","Mother-in-law's tongue":"Dracaena_trifasciata",
-"Oxalis triangularis":"Oxalis_triangularis","Parlour palm":"Chamaedorea_elegans",
-"Porcelain plant (Hoya)":"Hoya_carnosa","Rattlesnake plant":"Goeppertia_insignis",
-"Silver inch plant":"Tradescantia_zebrina","String of hearts":"Ceropegia_woodii",
-"Cape sundew":"Drosera_capensis"
-};
-async function photoFor(tile) {
- const title = wikiTitles[tile.dataset.species];
- if (!title) return;
- const img = document.createElement("img");
- img.alt = tile.dataset.species + " plant";
- img.loading = "lazy";
- img.referrerPolicy = "no-referrer";
- img.onload = () => tile.replaceChildren(img);
- img.onerror = () => { img.remove(); };
- try {
-  const response = await fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title),
-   {mode:"cors",credentials:"omit"});
-  if (!response.ok) throw new Error("No Wikipedia summary");
-  const data = await response.json();
-  const url = data.thumbnail?.source || data.originalimage?.source;
-  if (url && new URL(url).protocol === "https:") {
-   img.src = url;
-   return;
-  }
- } catch (_) {}
- /* Direct Wikimedia Commons file redirect for a known public-domain button fern photo. */
- if (title === "Pellaea_rotundifolia") {
-  img.src = "https://commons.wikimedia.org/wiki/Special:Redirect/file/Pellaearotundifolium.jpg?width=350";
- }
-}
-document.querySelectorAll(".plant-photo").forEach(photoFor);
-</script>
 </body></html>
