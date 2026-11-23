@@ -1,7 +1,4 @@
-"""Separate, opt-in, password-protected houseplant diary.
-
-No gemstone tables are touched. Routes return 503 until a password hash is set.
-"""
+"""Separate houseplant diary; gemstone database remains untouched."""
 from datetime import date, datetime, timezone
 from functools import wraps
 import os
@@ -10,8 +7,8 @@ import sqlite3
 from contextlib import closing
 from urllib.parse import urlsplit
 
-from flask import Blueprint, Response, abort, redirect, render_template, request, url_for
-from werkzeug.security import check_password_hash
+from flask import Blueprint, abort, redirect, render_template, request, url_for
+from favourite_feed.plant_collection import INITIAL_CARE, INITIAL_PLANTS
 
 plants = Blueprint("plants", __name__)
 DB_PATH = Path.home() / ".gemstonecabfinder-private" / "plants.db"
@@ -31,6 +28,7 @@ CARE = {
     "Cactus / succulent": ("Let the whole pot dry before watering; check moisture at depth, not just the surface.", "Soft translucent tissue suggests rot; stretched growth indicates insufficient light.", "Use a gritty mix, drainage and appropriate bright light."),
     "Other / not sure": ("Check moisture several centimetres down and the pot's weight; do not water merely because a date has passed.", "Watch for yellowing, wilting despite wet compost, pests, browning and changes in growth.", "Identify the species for more specific advice; ensure drainage and suitable light."),
 }
+CARE.update(INITIAL_CARE)
 
 
 def connection():
@@ -48,21 +46,25 @@ def connection():
         id INTEGER PRIMARY KEY, plant_id INTEGER NOT NULL REFERENCES houseplants(id) ON DELETE CASCADE,
         watered_on TEXT NOT NULL, recorded_at TEXT NOT NULL)""")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("CREATE TABLE IF NOT EXISTS plant_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    if not conn.execute("SELECT 1 FROM plant_metadata WHERE key='initial_collection_seeded'").fetchone():
+        with conn:
+            for name in INITIAL_PLANTS:
+                if not conn.execute("SELECT 1 FROM houseplants WHERE name=? COLLATE NOCASE", (name,)).fetchone():
+                    conn.execute("INSERT INTO houseplants(name,species,notes,created_at) VALUES (?,?,?,?)",
+                                 (name, name, "", datetime.now(timezone.utc).isoformat()))
+            conn.execute("INSERT INTO plant_metadata(key,value) VALUES ('initial_collection_seeded','1')")
     return conn
 
 
 def protected(fn):
+    """No login; reject cross-site writes to reduce unwanted edits."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        hashed = os.environ.get("PLANTS_PASSWORD_HASH", "")
-        if not hashed:
-            return "Houseplant diary is not configured yet.", 503
-        auth = request.authorization
-        if not auth or auth.type.lower() != "basic" or auth.username != "plants" or not check_password_hash(hashed, auth.password or ""):
-            return Response("Sign in to your private houseplant diary.", 401, {"WWW-Authenticate": 'Basic realm="Houseplant diary", charset="UTF-8"'})
         if request.method == "POST":
-            origin = request.headers.get("Origin", "")
-            if not origin or urlsplit(origin).scheme != "https" or urlsplit(origin).netloc != request.host:
+            origin = request.headers.get("Origin") or request.headers.get("Referer", "")
+            target = urlsplit(origin)
+            if target.scheme not in ("https", "http") or target.netloc != request.host:
                 abort(403)
         return fn(*args, **kwargs)
     return wrapper
