@@ -11,7 +11,7 @@ import secrets
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
-from favourite_feed.gemstone_quiz import GEMS, canonical_name, identify as identify_quiz_gem, options as quiz_options
+from favourite_feed.gemstone_quiz import GEMS, canonical_name, clean_label, identify as identify_quiz_gem, options as quiz_options
 from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
 app = Flask(__name__)
@@ -330,7 +330,24 @@ def gemstone_quiz():
     with connect_database() as conn:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_listing_images_listing_rank ON listing_images(listing_id, image_rank)")
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_labels (listing_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
-        labels = {row[0]: canonical_name(row[1]) for row in conn.execute("SELECT listing_id, name FROM quiz_labels")}
+        # Repair saved labels once per changed value; uncertain fragments go back to review.
+        saved_labels = conn.execute("SELECT q.listing_id, q.name, l.title FROM quiz_labels q JOIN listings l ON l.listing_id=q.listing_id").fetchall()
+        labels = {}
+        repairs = []
+        unresolved = []
+        for listing_id, name, title in saved_labels:
+            cleaned = clean_label(name, title)
+            if cleaned is None:
+                unresolved.append((listing_id, name))
+                continue
+            labels[listing_id] = cleaned
+            if cleaned != name:
+                repairs.append((cleaned, listing_id, name))
+        if repairs or unresolved:
+            conn.execute("CREATE TABLE IF NOT EXISTS quiz_label_cleanup_backup (listing_id INTEGER, name TEXT, PRIMARY KEY(listing_id, name))")
+            conn.executemany("INSERT OR IGNORE INTO quiz_label_cleanup_backup VALUES (?, ?)", [(i, old) for _, i, old in repairs] + unresolved)
+            conn.executemany("UPDATE quiz_labels SET name=? WHERE listing_id=? AND name=?", repairs)
+            conn.executemany("DELETE FROM quiz_labels WHERE listing_id=? AND name=?", unresolved)
         custom = {name for name in labels.values() if name}
         rows = conn.execute("""
             SELECT l.listing_id, l.title, l.listing_url,
@@ -392,7 +409,7 @@ def gemstone_quiz_settings():
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
         saved = conn.execute("SELECT value FROM quiz_settings WHERE id=1").fetchone()
         prior = json.loads(saved[0]) if saved else {}
-        excluded = (set(list(GEMS)[:30]) - set(prior)) if isinstance(prior, list) else set(prior.get("excluded", []))
+        excluded = (set(list(GEMS)[:30]) - set(prior)) if isinstance(prior, list) else {canonical_name(name) for name in prior.get("excluded", [])}
         excluded = (excluded - displayed) | (displayed - selected)
         conn.execute("INSERT OR REPLACE INTO quiz_settings VALUES (1, ?)", (json.dumps({"excluded": sorted(excluded)}),))
     return redirect(url_for("gemstone_quiz"))
