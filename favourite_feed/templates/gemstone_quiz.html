@@ -33,7 +33,7 @@
 <main class="quiz">
 <section aria-label="Refresh progress"><progress id="refresh-progress" max="1" value="0" style="width:100%"></progress><p id="refresh-status" role="status">Loading refresh status…</p></section>
 <details><summary>Quiz settings</summary><form method="post" action="{{ url_for('gemstone_quiz_settings') }}" style="text-align:left"><p>Untick gemstones you have learned. Only selected gemstones will be used as question subjects.</p>{% for gem in gem_names %}<input type="hidden" name="displayed" value="{{ gem }}"><label style="display:block;padding:.35rem"><input type="checkbox" name="gem" value="{{ gem }}" {% if gem in enabled %}checked{% endif %}> {{ gem }}{% if gem not in available %} (no photos yet){% endif %}</label>{% endfor %}<button type="submit">Save settings</button></form></details>
-<details id="review"><summary>Unrecognised gemstones ({{ review_count }})</summary>
+{% if not review_open %}<p><a href="{{ url_for('gemstone_quiz', review=1, seed=seed, position=position) }}#review">Unrecognised gemstones ({{ review_count }})</a></p>{% else %}<details id="review" open><summary>Unrecognised gemstones ({{ review_count }})</summary>
 <p>Review up to 10 listings at once. Enter names, tick Skip for unsuitable listings, or leave a row blank to review it later. Confirmed names are recognised in future titles.</p>
 {% if review %}
 <form method="post" action="{{ url_for('gemstone_quiz_labels') }}">
@@ -52,7 +52,7 @@
 <button type="submit" style="padding:.8rem 1rem">Save &amp; next 10</button>
 </form>
 {% else %}<p>No listings awaiting review.</p>{% endif %}
-</details>
+</details>{% endif %}
 {% if practice_notice %}<p>No enabled, matching photo is available for your previous guess. Continuing the quiz.</p>{% endif %}
 <p>Choose the gemstone shown. The seller’s identification and listing title appear immediately. Quiz settings are saved; answers are not recorded.</p>
 {% if item %}
@@ -100,7 +100,10 @@ buttons.forEach(button => button.addEventListener('click', () => {
   answerPanel.hidden = false;
   if (!correct && recognitionTip) recognitionTip.hidden = false;
 }));
+let statusBusy=false;
 async function showRefresh(){
+ if(document.hidden || statusBusy)return;
+ statusBusy=true;
  try {
   const response=await fetch('/refresh/status',{cache:'no-store'});
   if(!response.ok) throw Error('Status unavailable');
@@ -108,10 +111,10 @@ async function showRefresh(){
   const p=document.getElementById('refresh-progress');
   p.max=Math.max(1,s.total||0);p.value=s.done||0;
   document.getElementById('refresh-status').textContent=s.status==='never'?'No refresh recorded': 'Refresh: '+s.status+' · '+(s.done||0)+' / '+(s.total||0)+' shops · '+(s.new_listings||0)+' new listings · '+(s.failures||0)+' failures';
- }catch(e){document.getElementById('refresh-status').textContent='Refresh status temporarily unavailable';}
+ }catch(e){document.getElementById('refresh-status').textContent='Refresh status temporarily unavailable';}finally{statusBusy=false;}
 }
-if(location.hash==="#review")document.getElementById("review").open=true;
-showRefresh();setInterval(showRefresh,2000);
+if(location.hash==="#review" && document.getElementById("review"))document.getElementById("review").open=true;
+showRefresh();setInterval(showRefresh,5000);
 </script>
 <script src="{{ url_for('static',filename='refresh_worker.js') }}"></script>
 </body></html>
