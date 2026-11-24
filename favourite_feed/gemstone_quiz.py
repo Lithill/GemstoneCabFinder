@@ -520,6 +520,12 @@ GEMS.update({
 GEMS["Carnelian"][0].append("carnelian chalcedony")
 GEMS["Petrified palm wood"][0].extend(["fossilised palm wood", "fossilised palmwood", "petrified palm wood agate"])
 
+GEMS.update({
+    "Jade": (["jade"], ["Serpentine", "Chrysoprase", "Prehnite"]),
+    "Lavender jade": (["lavender jade", "lavender jadeite", "purple jade"], ["Phosphosiderite", "Lepidolite", "Lavender chalcedony"]),
+    "Jadeite": (["jadeite"], ["Nephrite", "Serpentine", "Chrysoprase"]),
+    "Nephrite": (["nephrite"], ["Jadeite", "Serpentine", "Prehnite"]),
+})
 ALIASES = {alias.casefold(): name for name, (aliases, _) in GEMS.items() for alias in [name] + aliases}
 
 def canonical_name(name):
