@@ -4,6 +4,7 @@ A listing is eligible only when its title clearly names exactly one recognised
 gemstone. Seller titles are not independently verified mineral identifications.
 The distractors are curated visual lookalikes, not random gemstones.
 """
+from functools import lru_cache
 import hashlib
 import random
 import re
@@ -477,12 +478,23 @@ UNSAFE = re.compile(
 
 
 def identify(title, custom=()):
+    return _identify_cached(title, tuple(sorted(set(custom) - set(GEMS))))
+
+
+@lru_cache(maxsize=8)
+def _patterns_for(custom):
+    patterns = dict(PATTERNS)
+    for name in custom:
+        patterns[name] = [re.compile(r"(?<![a-z])" + re.escape(name) + r"(?![a-z])", re.I)]
+    return patterns
+
+
+@lru_cache(maxsize=50000)
+def _identify_cached(title, custom):
     """Return one unambiguous recognised seller-stated stone, or None."""
     if not title or UNSAFE.search(title):
         return None
-    patterns = dict(PATTERNS)
-    for name in custom:
-        patterns.setdefault(name, [re.compile(r"(?<![a-z])" + re.escape(name) + r"(?![a-z])", re.I)])
+    patterns = _patterns_for(custom)
     hits = [(name, m.start(), m.end()) for name, ps in patterns.items() for p in ps for m in p.finditer(title)]
     matches = list({name for name, a, b in hits if not any(c <= a and d >= b and (c < a or d > b) for _, c, d in hits)})
     # Ignore broad colour-only cases, e.g. 'turquoise blue' is not a stone.
