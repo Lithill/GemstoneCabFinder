@@ -22,6 +22,6 @@
  }
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
  window.addEventListener('pagehide',()=>{stopped=true;});
- setInterval(tick,1000);
+ setInterval(tick,5000);
  tick();
 })();
