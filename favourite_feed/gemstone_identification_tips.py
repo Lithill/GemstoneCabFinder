@@ -138,3 +138,10 @@ TIPS.update({
     "Wild horse jasper": "Trade name often used for cream-white magnesite with brown matrix, giving irregular contrasting patches.",
     "Yellow onyx": "Often sold as banded yellow calcite or aragonite rather than true onyx; look for honey and cream layers."
 })
+
+TIPS.update({
+    "Jade": "Jade can be jadeite or nephrite. Look for a compact, interlocking texture, waxy to glossy polish and cloudy or mottled colour. Jadeite can be lavender, white or green; nephrite is often green or cream. Serpentine and dyed stones can look similar. Photos cannot establish authenticity.",
+    "Lavender jade": "Look for pale lilac to violet colour, cloudy white patches and a compact granular texture with a smooth waxy to glossy polish. Lepidolite often shows mica flakes, phosphosiderite can have yellow veins, and chalcedony may look more uniformly translucent. Lavender jadeite can be natural or treated; a photo cannot confirm identity or treatment.",
+    "Jadeite": "Often granular or mottled with a glossy polish and variable translucency; colours include green, lavender and white. Nephrite often has a more fibrous, waxy appearance, but laboratory testing is needed to distinguish them reliably.",
+    "Nephrite": "Often creamy white to dark green with a dense fibrous texture and waxy polish. Serpentine can look similar; visual appearance alone cannot establish identity."
+})
