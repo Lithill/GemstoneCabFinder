@@ -356,7 +356,7 @@ def gemstone_quiz():
     with connect_database() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
         saved = conn.execute("SELECT value FROM quiz_settings WHERE id=1").fetchone()
-    known = set(GEMS) | custom
+    known = set(GEMS) | set(custom)
     prior = json.loads(saved[0]) if saved else {}
     if isinstance(prior, list):
         # Migrate the original 30-name allowlist without disabling new names.
