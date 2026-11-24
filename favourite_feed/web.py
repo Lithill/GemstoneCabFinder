@@ -10,7 +10,7 @@ import secrets
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
-from favourite_feed.gemstone_quiz import identify as identify_quiz_gem, options as quiz_options
+from favourite_feed.gemstone_quiz import GEMS, identify as identify_quiz_gem, options as quiz_options
 from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
 app = Flask(__name__)
@@ -338,13 +338,35 @@ def gemstone_quiz():
     # A fresh random order per quiz, stable while navigating Previous/Next.
     rows.sort(key=lambda row: hashlib.sha256(
         f"{seed}:{row[0]['listing_id']}".encode("ascii")).digest())
+    available = {gem for _, gem in rows}
+    with connect_database() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+        saved = conn.execute("SELECT value FROM quiz_settings WHERE id=1").fetchone()
+    enabled = set(json.loads(saved[0])) if saved else set(GEMS)
+    rows = [(row, gem) for row, gem in rows if gem in enabled]
     total = len(rows)
     position = min(position, max(0, total - 1))
     item, answer = rows[position] if total else (None, None)
+    followup = request.args.get("practice", "")
+    example = next(((row, gem) for row, gem in rows if gem == followup), None)
+    if example:
+        item, answer = example
+    practice_notice = bool(followup and not example)
     return render_template("gemstone_quiz.html",
                            item=item, answer=answer, recognition_tip=GEMSTONE_TIPS.get(answer, ""),
                            choices=quiz_options(answer, seed, item["listing_id"]) if item else [],
-                           position=position, total=total, seed=seed)
+                           position=position, total=total, seed=seed,
+                           gem_names=sorted(GEMS), enabled=enabled, available=available,
+                           practice=bool(example), practice_notice=practice_notice)
+
+
+@app.post("/gemstone-quiz/settings")
+def gemstone_quiz_settings():
+    enabled = sorted(set(request.form.getlist("gem")) & set(GEMS))
+    with connect_database() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute("INSERT OR REPLACE INTO quiz_settings VALUES (1, ?)", (json.dumps(enabled),))
+    return redirect(url_for("gemstone_quiz"))
 
 
 @app.get("/listing/<int:listing_id>")
