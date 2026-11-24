@@ -5,6 +5,7 @@ from favourite_feed.database import connect_database, setup_database
 from favourite_feed.filters import is_visible, DEFAULT_EXCLUSIONS, DEFAULT_PREFERENCES
 import json
 from threading import Lock
+from functools import lru_cache
 import hashlib
 import secrets
 from favourite_feed.currency import price_context, update_rates
@@ -310,6 +311,12 @@ def etsy(listing_id):
             conn.execute("UPDATE listings SET seen_at=? WHERE listing_id=?", (datetime.now(timezone.utc).isoformat(),listing_id))
     return redirect(row["listing_url"], code=303)
 
+@lru_cache(maxsize=8)
+def _quiz_order(seed, ids):
+    return tuple(sorted(ids, key=lambda i: hashlib.sha256(
+        f"{seed}:{i}".encode("ascii")).digest()))
+
+
 @app.get("/gemstone-quiz")
 def gemstone_quiz():
     """Photo-first, read-only identification practice using collected Etsy images."""
@@ -321,6 +328,7 @@ def gemstone_quiz():
     if not (len(seed) == 16 and all(c in "0123456789abcdef" for c in seed)):
         seed = secrets.token_hex(8)
     with connect_database() as conn:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_listing_images_listing_rank ON listing_images(listing_id, image_rank)")
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_labels (listing_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
         labels = {row[0]: canonical_name(row[1]) for row in conn.execute("SELECT listing_id, name FROM quiz_labels")}
         custom = {name for name in labels.values() if name}
@@ -336,12 +344,14 @@ def gemstone_quiz():
             ORDER BY l.published_at DESC, l.listing_id DESC
         """).fetchall()
     # Only quiz titles with one recognised gemstone; do not guess from photos.
+    custom = tuple(sorted(custom))
     eligible = [(row, labels[row["listing_id"]] if row["listing_id"] in labels else identify_quiz_gem(row["title"], custom)) for row in rows]
     review = [row for row, gem in eligible if not gem and row["listing_id"] not in labels]
     rows = [(row, gem) for row, gem in eligible if gem]
     # A fresh random order per quiz, stable while navigating Previous/Next.
-    rows.sort(key=lambda row: hashlib.sha256(
-        f"{seed}:{row[0]['listing_id']}".encode("ascii")).digest())
+    order = _quiz_order(seed, tuple(row["listing_id"] for row, _ in rows))
+    by_id = {row["listing_id"]: (row, gem) for row, gem in rows}
+    rows = [by_id[i] for i in order]
     available = {gem for _, gem in rows}
     with connect_database() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
@@ -369,7 +379,8 @@ def gemstone_quiz():
                            choices=quiz_options(answer, seed, item["listing_id"], available & enabled) if item else [],
                            position=position, total=total, seed=seed,
                            gem_names=sorted(available), enabled=enabled, available=available,
-                           review=review[:10], review_count=len(review),
+                           review=review[:10] if request.args.get('review') == '1' else [], review_count=len(review),
+                           review_open=request.args.get('review') == '1',
                            practice=bool(example), practice_notice=practice_notice)
 
 
@@ -410,7 +421,7 @@ def gemstone_quiz_labels():
             name = "" if skip else canonical_name(existing.setdefault(name.casefold(), name[:1].upper() + name[1:]))
             updates.append((listing_id, name))
         conn.executemany("INSERT OR REPLACE INTO quiz_labels VALUES (?, ?)", updates)
-    return redirect(url_for("gemstone_quiz") + "#review")
+    return redirect(url_for("gemstone_quiz", review=1) + "#review")
 
 
 @app.post("/gemstone-quiz/label/<int:listing_id>")
