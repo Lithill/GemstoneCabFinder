@@ -10,7 +10,7 @@ import secrets
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
-from favourite_feed.gemstone_quiz import GEMS, identify as identify_quiz_gem, options as quiz_options
+from favourite_feed.gemstone_quiz import GEMS, canonical_name, identify as identify_quiz_gem, options as quiz_options
 from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
 app = Flask(__name__)
@@ -322,7 +322,7 @@ def gemstone_quiz():
         seed = secrets.token_hex(8)
     with connect_database() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_labels (listing_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
-        labels = dict(conn.execute("SELECT listing_id, name FROM quiz_labels").fetchall())
+        labels = {row[0]: canonical_name(row[1]) for row in conn.execute("SELECT listing_id, name FROM quiz_labels")}
         custom = {name for name in labels.values() if name}
         rows = conn.execute("""
             SELECT l.listing_id, l.title, l.listing_url,
@@ -353,7 +353,7 @@ def gemstone_quiz():
         original = set(list(GEMS)[:30])
         excluded = original - set(prior)
     else:
-        excluded = set(prior.get("excluded", []))
+        excluded = {canonical_name(name) for name in prior.get("excluded", [])}
     enabled = known - excluded
     rows = [(row, gem) for row, gem in rows if gem in enabled]
     total = len(rows)
@@ -407,7 +407,7 @@ def gemstone_quiz_labels():
                 continue
             if not conn.execute("SELECT 1 FROM listings WHERE listing_id=? AND seen_at IS NOT NULL", (listing_id,)).fetchone():
                 abort(404)
-            name = "" if skip else existing.setdefault(name.casefold(), name[:1].upper() + name[1:])
+            name = "" if skip else canonical_name(existing.setdefault(name.casefold(), name[:1].upper() + name[1:]))
             updates.append((listing_id, name))
         conn.executemany("INSERT OR REPLACE INTO quiz_labels VALUES (?, ?)", updates)
     return redirect(url_for("gemstone_quiz") + "#review")
