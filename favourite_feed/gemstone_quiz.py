@@ -456,10 +456,85 @@ GEMS.update({
 })
 GEMS.pop("Mookaite", None)
 
+GEMS.update({
+    "Abalone": (["abalone"], ["Mother of pearl","Ammolite","Opal"]),
+    "Afghanite": (["afghanite"], ["Lapis lazuli","Sodalite","Lazulite"]),
+    "Ammolite": (["ammolite"], ["Abalone","Opal","Labradorite"]),
+    "Aquaprase": (["aquaprase"], ["Chrysoprase","Gem silica","Turquoise"]),
+    "Aragonite": (["aragonite"], ["Calcite","Yellow onyx","Selenite"]),
+    "Aurora opal": (["aurora opal"], ["Opal","Opalite","Ammolite"]),
+    "Azurite": (["azurite"], ["Lapis lazuli","Sodalite","Shattuckite"]),
+    "Azurite-malachite": (["azurite-malachite","azurite malachite"], ["Malachite chrysocolla","Shattuckite","Azurite"]),
+    "Banded agate": (["banded agate"], ["Botswana agate","Crazy lace agate","Onyx"]),
+    "Binghamite": (["binghamite"], ["Tiger's eye","Pietersite","Bronzite"]),
+    "Bird's eye jasper": (["bird's eye jasper","birds eye jasper"], ["Ocean jasper","Kambaba jasper","Picture jasper"]),
+    "Cavansite": (["cavansite"], ["Azurite","Shattuckite","Blue apatite"]),
+    "Chrysocolla": (["chrysocolla"], ["Turquoise","Gem silica","Shattuckite"]),
+    "Crinoid fossil": (["crinoid fossil"], ["Fossil coral agate","Turritella jasper","Petrified palm wood"]),
+    "Dendritic agate": (["dendritic agate","dendrite agate","dentritic agate"], ["Dendritic opal","Moss agate","Dendrite fossil"]),
+    "Eudialyte": (["eudialyte"], ["Rhodonite","Ruby zoisite","Thulite"]),
+    "Fire quartz": (["fire quartz","hematoid quartz"], ["Lepidocrocite","Carnelian","Super seven"]),
+    "Gem silica": (["gem silica"], ["Aquaprase","Chrysocolla","Turquoise"]),
+    "Iolite": (["iolite"], ["Tanzanite","Sapphire","Amethyst"]),
+    "Jasper": (["jasper"], ["Agate","Rhyolite","Petrified wood"]),
+    "Kammererite": (["kammererite","kämmererite"], ["Charoite","Lepidolite","Sugilite"]),
+    "Lepidolite": (["lepidolite"], ["Charoite","Phosphosiderite","Kammererite"]),
+    "Marcasite with pyrite": (["marcasite with pyrite"], ["Pyrite","Chalcopyrite","Schalenblende"]),
+    "Mariposite": (["mariposite"], ["Fuchsite","Serpentine","Moss agate"]),
+    "Meteorite": (["meteorite"], ["Hematite","Magnetite","Tektite"]),
+    "Mohave turquoise": (["mohave turquoise","mojave turquoise"], ["Turquoise","Spiny oyster turquoise","Chrysocolla"]),
+    "Moldavite": (["moldavite"], ["Green obsidian","Peridot","Green fluorite"]),
+    "Moonstone with tourmaline": (["moonstone with tourmaline","moonstone with touramaline"], ["Tourmalinated quartz","Rainbow moonstone","Dendritic opal"]),
+    "Moss plume agate": (["moss plume agate"], ["Moss agate","Plume agate","Dendritic agate"]),
+    "Mother of pearl": (["mother of pearl"], ["Abalone","Moonstone","Opalite"]),
+    "Mystic topaz": (["mystic topaz"], ["Mystic quartz","Ammolite","Titanium aura quartz"]),
+    "Opalite": (["opalite"], ["Moonstone","Opal","White chalcedony"]),
+    "Peacock zoisite": (["peacock zoisite","peacock ziosite"], ["Ruby zoisite","Tanzanite","Eudialyte"]),
+    "Phosphosiderite": (["phosphosiderite"], ["Lepidolite","Sugilite","Charoite"]),
+    "Pietersite": (["pietersite"], ["Tiger's eye","Binghamite","Hawk's eye"]),
+    "Pinolith": (["pinolith"], ["Snowflake obsidian","Buffalo turquoise","Dalmatian jasper"]),
+    "Plume agate": (["plume agate"], ["Moss agate","Dendritic agate","Moss plume agate"]),
+    "Rainbow obsidian": (["rainbow obsidian"], ["Obsidian","Labradorite","Rainbow moonstone"]),
+    "Rhodochrosite": (["rhodochrosite"], ["Rhodonite","Pink opal","Pink calcite"]),
+    "Rhyolite": (["rhyolite"], ["Jasper","Ocean jasper","Kambaba jasper"]),
+    "Rosarita": (["rosarita"], ["Carnelian","Red coral","Red jasper"]),
+    "Ruby zoisite": (["ruby zoisite"], ["Ruby fuchsite","Unakite","Eudialyte"]),
+    "Schalenblende": (["schalenblende"], ["Banded agate","Marcasite with pyrite","Binghamite"]),
+    "Selenite": (["selenite"], ["Ulexite","Calcite","Clear quartz"]),
+    "Seraphinite": (["seraphinite"], ["Serpentine","Mariposite","Fuchsite"]),
+    "Shattuckite": (["shattuckite"], ["Azurite","Chrysocolla","Lapis lazuli"]),
+    "Spiny oyster turquoise": (["spiny oyster turquoise","spin oyster turquoise"], ["Mohave turquoise","Spiny oyster","Fordite"]),
+    "Sunstone lepidolite": (["sunstone lepidolite"], ["Sunstone","Lepidolite","Peach moonstone"]),
+    "Surfite": (["surfite"], ["Fordite","Crazy lace agate","Rainbow calsilica"]),
+    "Thulite": (["thulite"], ["Rhodonite","Rhodochrosite","Eudialyte"]),
+    "Tiffany stone": (["tiffany stone"], ["Charoite","Purple fluorite","Phosphosiderite"]),
+    "Titanium aura quartz": (["titanium aura quartz"], ["Mystic topaz","Bornite","Rainbow obsidian"]),
+    "Topaz": (["topaz"], ["Quartz","Aquamarine","Citrine"]),
+    "Tourmaline": (["tourmaline","touramaline"], ["Beryl","Topaz","Sapphire"]),
+    "Trolleite": (["trolleite"], ["Blue quartz","Lazulite","Sodalite"]),
+    "Turritella jasper": (["turritella jasper","turritella agate"], ["Crinoid fossil","Fossil coral agate","Agatized dinosaur bone"]),
+    "Vivianite": (["vivianite"], ["Kyanite","Azurite","Blue tourmaline"]),
+    "Wild horse jasper": (["wild horse jasper"], ["Buffalo turquoise","Picture jasper","Howlite"]),
+    "Yellow onyx": (["yellow onyx"], ["Aragonite","Calcite","Banded agate"]),
+})
+GEMS["Carnelian"][0].append("carnelian chalcedony")
+GEMS["Petrified palm wood"][0].extend(["fossilised palm wood", "fossilised palmwood", "petrified palm wood agate"])
+
 ALIASES = {alias.casefold(): name for name, (aliases, _) in GEMS.items() for alias in [name] + aliases}
 
 def canonical_name(name):
-    return ALIASES.get(name.casefold(), name) if name else name
+    return ALIASES.get(name.strip().casefold(), name.strip()) if name else name
+
+# Exact saved-label corrections only; never match truncated words in titles.
+LABEL_FIXES = {"buf": "Buffalo turquoise", "oce": "Ocean jasper", "mys": "Mystic topaz", "aurora o": "Aurora opal", "moss": "Moss agate"}
+INCOMPLETE_LABELS = {"fire", "water", "mother", "titanium", "titani", "ioli", "lab", "tiffany"}
+
+def clean_label(name, title):
+    key = name.strip().casefold()
+    if key in INCOMPLETE_LABELS or key in LABEL_FIXES:
+        # Resolve only from an unambiguous title; otherwise return to review.
+        return identify(title) or None
+    return canonical_name(name)
 
 # Match longer phrases first so "black tourmaline" isn't confused with
 # a generic term. Generic gemstone words in colour phrases are avoided.
