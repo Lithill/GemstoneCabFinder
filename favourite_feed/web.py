@@ -336,7 +336,7 @@ def gemstone_quiz():
             ORDER BY l.published_at DESC, l.listing_id DESC
         """).fetchall()
     # Only quiz titles with one recognised gemstone; do not guess from photos.
-    eligible = [(row, labels.get(row["listing_id"], identify_quiz_gem(row["title"], custom))) for row in rows]
+    eligible = [(row, labels[row["listing_id"]] if row["listing_id"] in labels else identify_quiz_gem(row["title"], custom)) for row in rows]
     review = [row for row, gem in eligible if not gem and row["listing_id"] not in labels]
     rows = [(row, gem) for row, gem in eligible if gem]
     # A fresh random order per quiz, stable while navigating Previous/Next.
@@ -369,7 +369,7 @@ def gemstone_quiz():
                            choices=quiz_options(answer, seed, item["listing_id"], available & enabled) if item else [],
                            position=position, total=total, seed=seed,
                            gem_names=sorted(available), enabled=enabled, available=available,
-                           review=review[:25], review_count=len(review),
+                           review=review[:10], review_count=len(review),
                            practice=bool(example), practice_notice=practice_notice)
 
 
@@ -385,6 +385,32 @@ def gemstone_quiz_settings():
         excluded = (excluded - displayed) | (displayed - selected)
         conn.execute("INSERT OR REPLACE INTO quiz_settings VALUES (1, ?)", (json.dumps({"excluded": sorted(excluded)}),))
     return redirect(url_for("gemstone_quiz"))
+
+
+@app.post("/gemstone-quiz/labels")
+def gemstone_quiz_labels():
+    ids = request.form.getlist("listing_id")
+    if len(ids) > 10 or len(set(ids)) != len(ids) or any(not i.isascii() or not i.isdigit() or len(i) > 18 for i in ids):
+        abort(400)
+    with connect_database() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_labels (listing_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+        existing = {gem.casefold(): gem for gem in GEMS}
+        existing.update({row[0].casefold(): row[0] for row in conn.execute("SELECT DISTINCT name FROM quiz_labels WHERE name != ''")})
+        updates = []
+        for raw in ids:
+            listing_id = int(raw)
+            name = " ".join(request.form.get("name_" + raw, "").split())
+            skip = request.form.get("skip_" + raw) == "1"
+            if len(name) > 100:
+                abort(400)
+            if not name and not skip:
+                continue
+            if not conn.execute("SELECT 1 FROM listings WHERE listing_id=? AND seen_at IS NOT NULL", (listing_id,)).fetchone():
+                abort(404)
+            name = "" if skip else existing.setdefault(name.casefold(), name[:1].upper() + name[1:])
+            updates.append((listing_id, name))
+        conn.executemany("INSERT OR REPLACE INTO quiz_labels VALUES (?, ?)", updates)
+    return redirect(url_for("gemstone_quiz") + "#review")
 
 
 @app.post("/gemstone-quiz/label/<int:listing_id>")
