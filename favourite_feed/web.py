@@ -321,19 +321,23 @@ def gemstone_quiz():
     if not (len(seed) == 16 and all(c in "0123456789abcdef" for c in seed)):
         seed = secrets.token_hex(8)
     with connect_database() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_labels (listing_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+        labels = dict(conn.execute("SELECT listing_id, name FROM quiz_labels").fetchall())
+        custom = {name for name in labels.values() if name}
         rows = conn.execute("""
             SELECT l.listing_id, l.title, l.listing_url,
                    (SELECT image_url FROM listing_images i
                     WHERE i.listing_id = l.listing_id
-                    ORDER BY image_rank LIMIT 1) AS photo
+                    AND i.image_url IS NOT NULL AND i.image_url != '' ORDER BY image_rank LIMIT 1) AS photo
             FROM listings l
-            WHERE EXISTS (SELECT 1 FROM listing_images i
+            WHERE l.seen_at IS NOT NULL AND EXISTS (SELECT 1 FROM listing_images i
                           WHERE i.listing_id = l.listing_id
                             AND i.image_url IS NOT NULL AND i.image_url != '')
             ORDER BY l.published_at DESC, l.listing_id DESC
         """).fetchall()
     # Only quiz titles with one recognised gemstone; do not guess from photos.
-    eligible = [(row, identify_quiz_gem(row["title"])) for row in rows]
+    eligible = [(row, labels.get(row["listing_id"], identify_quiz_gem(row["title"], custom))) for row in rows]
+    review = [row for row, gem in eligible if not gem and row["listing_id"] not in labels]
     rows = [(row, gem) for row, gem in eligible if gem]
     # A fresh random order per quiz, stable while navigating Previous/Next.
     rows.sort(key=lambda row: hashlib.sha256(
@@ -342,7 +346,15 @@ def gemstone_quiz():
     with connect_database() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
         saved = conn.execute("SELECT value FROM quiz_settings WHERE id=1").fetchone()
-    enabled = set(json.loads(saved[0])) if saved else set(GEMS)
+    known = set(GEMS) | custom
+    prior = json.loads(saved[0]) if saved else {}
+    if isinstance(prior, list):
+        # Migrate the original 30-name allowlist without disabling new names.
+        original = set(list(GEMS)[:30])
+        excluded = original - set(prior)
+    else:
+        excluded = set(prior.get("excluded", []))
+    enabled = known - excluded
     rows = [(row, gem) for row, gem in rows if gem in enabled]
     total = len(rows)
     position = min(position, max(0, total - 1))
@@ -354,19 +366,42 @@ def gemstone_quiz():
     practice_notice = bool(followup and not example)
     return render_template("gemstone_quiz.html",
                            item=item, answer=answer, recognition_tip=GEMSTONE_TIPS.get(answer, ""),
-                           choices=quiz_options(answer, seed, item["listing_id"]) if item else [],
+                           choices=quiz_options(answer, seed, item["listing_id"], available & enabled) if item else [],
                            position=position, total=total, seed=seed,
-                           gem_names=sorted(GEMS), enabled=enabled, available=available,
+                           gem_names=sorted(available), enabled=enabled, available=available,
+                           review=review[:25], review_count=len(review),
                            practice=bool(example), practice_notice=practice_notice)
 
 
 @app.post("/gemstone-quiz/settings")
 def gemstone_quiz_settings():
-    enabled = sorted(set(request.form.getlist("gem")) & set(GEMS))
+    displayed = set(request.form.getlist("displayed"))
+    selected = set(request.form.getlist("gem"))
     with connect_database() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
-        conn.execute("INSERT OR REPLACE INTO quiz_settings VALUES (1, ?)", (json.dumps(enabled),))
+        saved = conn.execute("SELECT value FROM quiz_settings WHERE id=1").fetchone()
+        prior = json.loads(saved[0]) if saved else {}
+        excluded = (set(list(GEMS)[:30]) - set(prior)) if isinstance(prior, list) else set(prior.get("excluded", []))
+        excluded = (excluded - displayed) | (displayed - selected)
+        conn.execute("INSERT OR REPLACE INTO quiz_settings VALUES (1, ?)", (json.dumps({"excluded": sorted(excluded)}),))
     return redirect(url_for("gemstone_quiz"))
+
+
+@app.post("/gemstone-quiz/label/<int:listing_id>")
+def gemstone_quiz_label(listing_id):
+    name = " ".join(request.form.get("name", "").split())
+    if len(name) > 100:
+        abort(400)
+    with connect_database() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_labels (listing_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+        if not conn.execute("SELECT 1 FROM listings WHERE listing_id=? AND seen_at IS NOT NULL", (listing_id,)).fetchone():
+            abort(404)
+        existing = list(GEMS) + [r[0] for r in conn.execute("SELECT DISTINCT name FROM quiz_labels WHERE name != ''")]
+        name = next((gem for gem in existing if gem.casefold() == name.casefold()), name[:1].upper() + name[1:])
+        if not name and request.form.get("skip") != "1":
+            abort(400)
+        conn.execute("INSERT OR REPLACE INTO quiz_labels VALUES (?, ?)", (listing_id, name))
+    return redirect(url_for("gemstone_quiz") + "#review")
 
 
 @app.get("/listing/<int:listing_id>")
