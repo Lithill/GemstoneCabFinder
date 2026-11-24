@@ -51,6 +51,8 @@ def setup_database():
                 image_url TEXT NOT NULL,
                 image_rank INTEGER
             );
+            CREATE INDEX IF NOT EXISTS idx_listing_images_listing_rank ON listing_images(listing_id, image_rank);
+            CREATE INDEX IF NOT EXISTS idx_listings_seen_published ON listings(published_at DESC, listing_id DESC) WHERE seen_at IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_listings_published
                 ON listings(published_at DESC);
         """)
