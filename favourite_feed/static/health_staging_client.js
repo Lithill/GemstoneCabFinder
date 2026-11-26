@@ -24,7 +24,13 @@
   let loadedDay = null;
   let savedSnapshot = null;
   let suppressChanges = false;
-  const show = message => { status.textContent = message; };
+  let backupFailed = false;
+  const show = message => {
+    status.textContent = message + (backupFailed ? " Warning: your diary is saved, but the encrypted backup failed. Save again to retry." : "");
+  };
+  const updateBackup = result => {
+    if (typeof result.backup_ok === "boolean") backupFailed = !result.backup_ok;
+  };
   const entriesForSave = () => diary.map(({name, answer, extras}) => ({name, answer, extras, notes:""}));
   const snapshot = () => JSON.stringify(entriesForSave().slice().sort((a,b) => a.name.localeCompare(b.name)));
   const setDirty = value => {
@@ -110,6 +116,7 @@
     if (dirty) throw new Error("Save or discard your unsaved changes before deleting a saved answer.");
     if (!confirm("Delete the saved answer for " + question + " on " + day + "? Older backups may still contain it.")) return;
     const result = await api("delete/" + encodeURIComponent(day), "POST", {question});
+    updateBackup(result);
     if (result.deleted) {
       replaceDiary(diary.filter(entry => entry.name !== question));
       savedSnapshot = snapshot();
@@ -125,6 +132,7 @@
       return;
     }
     const result = await api("checkin/" + encodeURIComponent(day), "POST", {entries});
+    updateBackup(result);
     savedSnapshot = snapshot();
     setDirty(false);
     show("Saved " + result.saved + " answers for " + day + ". Existing answers not shown here remain saved.");
