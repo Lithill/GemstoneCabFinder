@@ -145,6 +145,41 @@ def impact(day, window):
     return jsonify(rows=rows, events=events)
 
 
+@health_api.route("/exercise/<day>", methods=["GET", "POST"])
+def exercise(day):
+    from favourite_feed.health_exercise import KEY, validate
+    from favourite_feed.health_vault import get, put, delete
+    try:
+        if date.fromisoformat(day).isoformat() != day:
+            raise ValueError
+    except ValueError:
+        abort(400)
+    path = _vault_path()
+    if request.method == "GET":
+        return jsonify(get(day, KEY, path=path) or {"rest": False, "sessions": []})
+    try:
+        log = validate(request.get_json(silent=True))
+        if log["rest"] or log["sessions"]:
+            put(day, KEY, log, path=path)
+        else:
+            delete(day, KEY, path=path)
+    except (ValueError, TypeError):
+        abort(400)
+    return jsonify(backup_ok=_backup_after_write(path))
+
+
+@health_api.get("/exercise-impact/<int:days>/<int:lag>")
+def exercise_impact(days, lag):
+    from favourite_feed.health_exercise import KEY, compare_exercise
+    from favourite_feed.health_vault import get
+    if days not in (30, 60, 90) or lag not in (0, 1, 2, 3):
+        abort(400)
+    path = _vault_path()
+    return jsonify(compare_exercise(date.today(), days, lag,
+        lambda d: get(d, KEY, path=path),
+        lambda d: read_diary_offline(d, path=path)))
+
+
 @health_api.get("/session")
 def session():
     current = _valid_session()
