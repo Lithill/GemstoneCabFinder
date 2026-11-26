@@ -7,6 +7,19 @@
   const symptom = document.getElementById("insight-symptom");
   const chart = document.getElementById("insight-chart");
   const status = document.getElementById("insight-status");
+  const diaryTab = document.getElementById("diary-tab");
+  const insightsTab = document.getElementById("insights-tab");
+  const diaryPanel = document.getElementById("diary-panel");
+  const insightsPanel = document.getElementById("insights-panel");
+  function selectView(insights) {
+    diaryPanel.hidden = insights;
+    insightsPanel.hidden = !insights;
+    diaryTab.setAttribute("aria-pressed", String(!insights));
+    insightsTab.setAttribute("aria-pressed", String(insights));
+    if (insights) load();
+  }
+  diaryTab.addEventListener("click", () => selectView(false));
+  insightsTab.addEventListener("click", () => selectView(true));
   let data = null, sequence = 0;
   month.value = dayInput.value.slice(0, 7);
   function draw() {
@@ -51,6 +64,7 @@
       button.setAttribute("aria-label", date + (entry ? ", " + entry.count + " recorded answers" : ", no recorded answers"));
       button.addEventListener("click", () => {
         if (dayInput.disabled) return;
+        selectView(false);
         dayInput.value = date;
         dayInput.dispatchEvent(new Event("change"));
         dayInput.scrollIntoView({block:"center"});
@@ -83,6 +97,5 @@
   month.addEventListener("change", load);
   symptom.addEventListener("change", draw);
   document.getElementById("insight-refresh").addEventListener("click", load);
-  document.addEventListener("tracker:saved", load);
-  load();
+  document.addEventListener("tracker:saved", () => { if (!insightsPanel.hidden) load(); });
 })();
