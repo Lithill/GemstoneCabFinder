@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Perimenopause tracker{% if not personal_diary %} · Design preview{% endif %}</title>
+<title>Health Tracker{% if not personal_diary %} · Design preview{% endif %}</title>
 <link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
 <link rel="stylesheet" href="{{ url_for('static',filename='symptom_tracker.css') }}"></head>
-<body><header><h1>Perimenopause tracker</h1><nav>{% if site_auth %}<a href="/dashboard">Dashboard</a>{% elif private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
+<body><header><h1>Health Tracker</h1><nav>{% if site_auth %}<a href="/dashboard">Dashboard</a>{% elif private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 {% if storage_staging %}
 <div class="tracker-tabs" role="group" aria-label="Tracker views"><button type="button" id="diary-tab" aria-pressed="true" aria-controls="diary-panel">My diary</button><button type="button" id="insights-tab" aria-pressed="false" aria-controls="insights-panel">Calendar &amp; trends</button><button type="button" id="factors-tab" aria-pressed="false" aria-controls="factors-panel">Lifestyle &amp; changes</button><button type="button" id="impact-tab" aria-pressed="false" aria-controls="impact-panel">Impact analysis</button></div>
@@ -69,6 +69,12 @@
 <div id="insight-chart" class="insight-chart" tabindex="0" aria-label="Monthly severity chart"></div>
 <p>Scroll across the combined timeline to see every day. Blank severity cells mean no rating at that level; a blank column means no symptom rating. Exercise numbers are total minutes; R means recorded rest. Bleeding: P = period, S = spotting, U = unexpected, – = explicitly none. Changes shows the number of dated ongoing changes. Blank activity or bleeding cells mean not recorded.</p>
 <div id="insight-context" aria-label="Monthly lifestyle context"></div>
+<h3>Longer-term symptom trends</h3>
+<label for="long-symptom">Symptom</label><select id="long-symptom"><option>Fibromyalgia pain</option><option>Fatigue / lacking in energy</option></select>
+<label for="long-months">Months including current month</label><select id="long-months"><option>3</option><option selected>6</option><option>12</option></select>
+<button type="button" id="long-load">Show longer-term trends</button>
+<p id="long-status" role="status"></p><div id="long-results"></div>
+<p>Monthly averages use recorded ratings only. The current month is incomplete; sparse or differently recorded months may not be comparable. Missing ratings are not zero.</p>
 <p>Timing can suggest associations, but does not establish what caused a symptom change.</p>
 </section>
 {% endif %}
@@ -165,4 +171,5 @@
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_cycle.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_review.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_combined.js') }}" defer></script>{% endif %}
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_long_trends.js') }}" defer></script>{% endif %}
 </body></html>
