@@ -6,7 +6,7 @@ Do not enable on production before privacy/security review and explicit approval
 import os
 from pathlib import Path
 
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, abort, jsonify, request, current_app
 
 from favourite_feed.health_auth import _valid_session, health_csrf_required
 from favourite_feed.health_diary_bridge import read_diary_offline, save_diary_offline
@@ -53,6 +53,18 @@ def private_headers(response):
     return response
 
 
+def _backup_after_write(path):
+    if os.environ.get("HEALTH_AUTO_BACKUP_ENABLED") != "1":
+        return None
+    try:
+        from scripts.health_daily_backup import rotate
+        rotate(path, path.parent / (path.name + ".backups"), refresh=True)
+        return True
+    except Exception:
+        current_app.logger.error("Health diary saved but encrypted backup failed")
+        return False
+
+
 @health_api.get("/session")
 def session():
     current = _valid_session()
@@ -77,7 +89,7 @@ def save_checkin(day):
         count = save_diary_offline(day, payload["entries"], path=_vault_path())
     except (ValueError, TypeError):
         abort(400)
-    return jsonify(saved=count)
+    return jsonify(saved=count, backup_ok=_backup_after_write(_vault_path()))
 
 
 @health_api.post("/delete/<day>")
@@ -89,7 +101,7 @@ def delete_checkin_entry(day):
         deleted = delete_validated(day, payload["question"], path=_vault_path())
     except ValueError:
         abort(400)
-    return jsonify(deleted=deleted)
+    return jsonify(deleted=deleted, backup_ok=_backup_after_write(_vault_path()))
 
 
 def register_staging_api(app):
