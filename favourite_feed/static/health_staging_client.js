@@ -116,6 +116,7 @@
     if (dirty) throw new Error("Save or discard your unsaved changes before deleting a saved answer.");
     if (!confirm("Delete the saved answer for " + question + " on " + day + "? Older backups may still contain it.")) return;
     const result = await api("delete/" + encodeURIComponent(day), "POST", {question});
+    document.dispatchEvent(new Event("tracker:saved"));
     updateBackup(result);
     if (result.deleted) {
       replaceDiary(diary.filter(entry => entry.name !== question));
@@ -132,6 +133,7 @@
       return;
     }
     const result = await api("checkin/" + encodeURIComponent(day), "POST", {entries});
+    document.dispatchEvent(new Event("tracker:saved"));
     updateBackup(result);
     savedSnapshot = snapshot();
     setDirty(false);
