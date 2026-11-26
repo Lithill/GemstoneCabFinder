@@ -23,7 +23,7 @@ QUESTIONS = {
     "Difficulty concentrating / loss of concentration": "severity",
     "Fatigue / lacking in energy": "severity",
     "Difficulty sleeping / insomnia": "sleep",
-    "Bloating": "severity", "Breathing difficulties": "severity",
+    "Fibromyalgia pain": "severity", "Bloating": "severity", "Breathing difficulties": "severity",
     "Digestive problems": "severity", "Feeling dizzy or faint": "severity",
     "Headaches": "severity", "Heartburn": "severity",
     "Heart palpitations": "severity", "Migraines": "severity",
