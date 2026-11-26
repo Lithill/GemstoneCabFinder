@@ -128,7 +128,22 @@ def _revoke(nonce):
         conn.execute("DELETE FROM revoked_sessions WHERE expires_at < ?", (int(time.time()),))
 
 
+def site_auth_mode():
+    return os.environ.get("HEALTH_SITE_AUTH_ENABLED") == "1"
+
+
 def _valid_session():
+    if site_auth_mode():
+        # Deployment prerequisite: verified upstream authentication on every URL.
+        # No client-supplied identity or forwarded headers are trusted here.
+        if not request.is_secure:
+            return None
+        try:
+            _key()
+            return {"csrf": hmac.new(_secret().encode(), b"site-health-csrf-v1", hashlib.sha256).hexdigest()}
+        except (RuntimeError, UnicodeError):
+            return None
+
     # Configuration removal or corruption must invalidate existing sessions too.
     if not credentials_ready():
         return None
@@ -151,6 +166,8 @@ def require_health_login(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if not _valid_session():
+            if site_auth_mode():
+                abort(403)
             return _cookie(make_response(redirect(url_for("health_auth.login"), code=303)))
         return view(*args, **kwargs)
     return wrapped
@@ -227,5 +244,7 @@ def logout():
 def health_csrf_required():
     """For future write endpoints: verify a session-bound CSRF token."""
     current = _valid_session()
+    if site_auth_mode() and request.headers.get("Origin") != request.host_url.rstrip("/"):
+        abort(403)
     if not current or not hmac.compare_digest(request.headers.get("X-Health-CSRF", ""), current["csrf"]):
         abort(403)
