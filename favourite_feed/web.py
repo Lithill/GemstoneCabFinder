@@ -11,7 +11,7 @@ import secrets
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
-from favourite_feed.gemstone_quiz import GEMS, canonical_name, clean_label, material_info, display_answer, material_category, identify as identify_quiz_gem, options as quiz_options
+from favourite_feed.gemstone_quiz import GEMS, canonical_name, clean_label, material_info, display_answer, material_category, visual_alternatives, identify as identify_quiz_gem, options as quiz_options
 from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
 app = Flask(__name__)
@@ -391,7 +391,8 @@ def gemstone_quiz():
     elif mode == "practice":
         rows = [(row, gem) for row, gem in rows if learning.get(gem, (0, 0, 0))[2] > learning.get(gem, (0, 0, 0))[1]]
     elif mode == "adaptive":
-        rows.sort(key=lambda pair: learning.get(pair[1], (0, 0, 0))[1] - learning.get(pair[1], (0, 0, 0))[2])
+        # Keep ordering stable during a session; prioritize weak material on a fresh round.
+        rows = _adaptive_rows(seed, rows, learning)
     total = len(rows)
     position = min(position, max(0, total - 1))
     item, answer = rows[position] if total else (None, None)
@@ -411,12 +412,27 @@ def gemstone_quiz():
                            practice=bool(example), practice_notice=practice_notice)
 
 
+# Bounded session ordering cache; ratings affect the next fresh round.
+_adaptive_orders = {}
+def _adaptive_rows(seed, rows, learning):
+    key = (seed, tuple(row["listing_id"] for row, _ in rows))
+    order = _adaptive_orders.get(key)
+    if order is None:
+        ranked = sorted(rows, key=lambda pair: learning.get(pair[1], (0, 0, 0))[1] - learning.get(pair[1], (0, 0, 0))[2])
+        order = tuple(row["listing_id"] for row, _ in ranked)
+        if len(_adaptive_orders) >= 8:
+            _adaptive_orders.clear()
+        _adaptive_orders[key] = order
+    by_id = {row["listing_id"]: (row, gem) for row, gem in rows}
+    return [by_id[i] for i in order]
+
+
 @app.post("/gemstone-quiz/learning")
 def gemstone_quiz_learning():
     data = request.get_json(silent=True) or {}
     name = data.get("name")
     rating = data.get("rating")
-    if not isinstance(name, str) or not name or len(name) > 100 or rating not in {"knew", "guess", "practice"}:
+    if not isinstance(name, str) or not name or len(name) > 100 or not isinstance(rating, str) or rating not in {"knew", "guess", "practice"}:
         abort(400)
     with connect_database() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_learning (name TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0, confident INTEGER NOT NULL DEFAULT 0, needs INTEGER NOT NULL DEFAULT 0)")
@@ -453,7 +469,7 @@ def gemstone_library():
             if name:
                 photos.setdefault(name, photo)
     names = sorted(set(GEMS) | set(custom))
-    entries = [(name, material_info(name), photos.get(name), GEMSTONE_TIPS.get(name, ""), GEMS.get(name, ([], []))[1]) for name in names if not query or query in (name + " " + display_answer(name)).casefold()]
+    entries = [(name, material_info(name), photos.get(name), GEMSTONE_TIPS.get(name, ""), list(dict.fromkeys(GEMS.get(name, ([], []))[1] + visual_alternatives(name)))[:5]) for name in names if not query or query in (name + " " + display_answer(name)).casefold()]
     return render_template("gemstone_library.html", entries=entries, query=query, display_answer=display_answer)
 
 
