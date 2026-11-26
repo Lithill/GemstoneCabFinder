@@ -103,6 +103,27 @@ def factors(day):
     return jsonify(saved=len(items), backup_ok=_backup_after_write(path))
 
 
+@health_api.route("/ongoing", methods=["GET", "POST"])
+def ongoing():
+    from favourite_feed.health_ongoing import validate, KEY_DAY, KEY_QUESTION
+    from favourite_feed.health_vault import get, put, delete
+    path = _vault_path()
+    if request.method == "GET":
+        return jsonify(items=(get(KEY_DAY, KEY_QUESTION, path=path) or {}).get("items", []))
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or set(payload) != {"items"}:
+        abort(400)
+    try:
+        items = validate(payload["items"])
+        if items:
+            put(KEY_DAY, KEY_QUESTION, {"items": items}, path=path)
+        else:
+            delete(KEY_DAY, KEY_QUESTION, path=path)
+    except (ValueError, TypeError):
+        abort(400)
+    return jsonify(saved=len(items), backup_ok=_backup_after_write(path))
+
+
 @health_api.get("/session")
 def session():
     current = _valid_session()
