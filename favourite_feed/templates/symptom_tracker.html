@@ -6,6 +6,10 @@
 <body><header><h1>Perimenopause tracker</h1><nav>{% if site_auth %}<a href="/dashboard">Dashboard</a>{% elif private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 {% if storage_staging %}
+<div class="tracker-tabs" role="group" aria-label="Tracker views"><button type="button" id="diary-tab" aria-pressed="true" aria-controls="diary-panel">My diary</button><button type="button" id="insights-tab" aria-pressed="false" aria-controls="insights-panel">Calendar &amp; trends</button></div>
+{% endif %}
+<div id="diary-panel">
+{% if storage_staging %}
 <div class="tracker-warning">{% if personal_diary %}<strong>Your private symptom diary.</strong>{% else %}<strong>Private test diary — fictional information only.</strong>{% endif %} Your selected date loads automatically before entering answers. Nothing is stored until you choose Save check-in. Free-text notes are not stored.</div>
 {% else %}
 <div class="tracker-warning"><strong>Design preview only — nothing is saved.</strong> Answers stay on this page temporarily. Leaving or refreshing clears them. Do not enter identifying or sensitive notes during testing.</div>
@@ -50,8 +54,9 @@
 <div id="diary-items"></div>
 <button type="button" id="clear-diary">{% if storage_staging %}Clear on-screen entries (does not delete saved answers){% else %}Clear preview entries{% endif %}</button>
 </section>
+</div>
 {% if storage_staging %}
-<section aria-label="Symptom insights">
+<section id="insights-panel" hidden aria-label="Symptom insights">
 <h2>Symptom calendar and trends</h2>
 <label for="insight-month">Month</label>
 <input type="month" id="insight-month">
