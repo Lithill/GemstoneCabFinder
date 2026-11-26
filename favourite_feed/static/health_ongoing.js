@@ -32,7 +32,7 @@
    if(item.history.some(e=>e.day===event.day)&&!confirm("Replace the recorded change on this date?"))return;
    item.history=item.history.filter(e=>e.day!==event.day);item.history.push(event);
    busy=true;render();for(const field of [name,category,day,state,dose])field.disabled=true;
-   try{const session=await api("session");const result=await api("ongoing",{method:"POST",headers:{"Content-Type":"application/json","X-CSRF-Token":session.csrf},body:JSON.stringify({items:next})});items=next;name.value="";dose.value="";day.value=today();status.textContent=result.backup_ok===false?"Saved, but backup failed. Repeat save to retry.":"Dated change saved";}
+   try{const session=await api("session");const result=await api("ongoing",{method:"POST",headers:{"Content-Type":"application/json","X-Health-CSRF":session.csrf},body:JSON.stringify({items:next})});items=next;name.value="";dose.value="";day.value=today();status.textContent=result.backup_ok===false?"Saved, but backup failed. Repeat save to retry.":"Dated change saved";}
    catch(_){status.textContent="Could not save. Your input remains available.";}
    finally{busy=false;for(const field of [name,category,day,state,dose])field.disabled=false;render();}
  };
