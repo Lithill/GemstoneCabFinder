@@ -1,4 +1,5 @@
 import json
+from requests.exceptions import HTTPError
 from datetime import datetime, timezone
 from config import SEARCH_TERMS, MIN_SHOP_RATING, MIN_SHOP_REVIEWS, MIN_SHOP_AGE_DAYS, TARGET_SHIPPING_COUNTRIES
 from favourite_feed.database import connect_database, PROJECT_ROOT
@@ -50,7 +51,17 @@ def step():
         queued=conn.execute("SELECT * FROM discovery_queue ORDER BY shop_id LIMIT 1").fetchone()
     if queued:
         sid=queued["shop_id"]
-        shop=etsy_get(f"shops/{sid}")
+        try:
+            shop=etsy_get(f"shops/{sid}")
+        except HTTPError as exc:
+            if exc.response is None or exc.response.status_code not in (404, 410):
+                raise
+            # A missing shop should not block the queue. Retry in a future search
+            # after the ordinary checked-shop cache expires.
+            with connect_database() as conn:
+                conn.execute("INSERT OR REPLACE INTO discovery_checked VALUES (?,datetime('now'))",(sid,))
+                conn.execute("DELETE FROM discovery_queue WHERE shop_id=?",(sid,))
+            return f"Skipped unavailable shop {sid}"
         rating=shop.get("review_average") or 0
         reviews=shop.get("review_count") or 0
         country=shop.get("shipping_from_country_iso")
