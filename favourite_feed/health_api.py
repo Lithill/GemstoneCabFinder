@@ -180,6 +180,21 @@ def exercise_impact(days, lag):
         lambda d: read_diary_offline(d, path=path)))
 
 
+@health_api.get("/exercise-recovery/<int:days>/<int:lag>/<mode>")
+def exercise_recovery(days, lag, mode):
+    from favourite_feed.health_recovery import GROUPS, compare_recovery
+    from favourite_feed.health_exercise import KEY
+    from favourite_feed.health_vault import get
+    symptom = request.args.get("symptom", "Fibromyalgia pain")
+    if days not in (30, 60, 90) or lag not in (0, 1, 2, 3) or mode not in GROUPS or QUESTIONS.get(symptom) not in ("severity", "sleep"):
+        abort(400)
+    path = _vault_path()
+    return jsonify(rows=compare_recovery(date.today(), days, lag, mode, symptom,
+        lambda d: get(d, KEY, path=path),
+        lambda d: read_diary_offline(d, path=path)),
+        symptoms=[q for q, kind in QUESTIONS.items() if kind in ("severity", "sleep")])
+
+
 @health_api.get("/personal-insights")
 def personal_insights():
     from favourite_feed.health_personal_insights import summarize
