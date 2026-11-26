@@ -2,10 +2,10 @@ name: Health security tests (offline)
 on:
   push:
     branches:
-      - feature/favourite-feed
+      - main
   pull_request:
     branches:
-      - feature/favourite-feed
+      - main
   workflow_dispatch:
 permissions:
   contents: read
