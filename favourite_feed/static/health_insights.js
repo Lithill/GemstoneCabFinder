@@ -14,6 +14,8 @@
   function selectView(insights) {
     document.getElementById("factors-panel").hidden = true;
     document.getElementById("factors-tab").setAttribute("aria-pressed", "false");
+    document.getElementById("impact-panel").hidden = true;
+    document.getElementById("impact-tab").setAttribute("aria-pressed","false");
     diaryPanel.hidden = insights;
     insightsPanel.hidden = !insights;
     diaryTab.setAttribute("aria-pressed", String(!insights));
