@@ -221,6 +221,23 @@ def period_review(days):
         lambda d: get(d, KEY, path=path)))
 
 
+@health_api.get("/combined/<int:days>/<int:lag>")
+def combined_impact(days, lag):
+    from favourite_feed.health_combined import compare_combined
+    from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION
+    from favourite_feed.health_exercise import KEY
+    from favourite_feed.health_vault import get
+    symptom = request.args.get("symptom", "Fibromyalgia pain")
+    if days not in (30, 60, 90) or lag not in (0, 1, 2, 3) or QUESTIONS.get(symptom) not in ("severity", "sleep"):
+        abort(400)
+    path = _vault_path()
+    items = (get(KEY_DAY, KEY_QUESTION, path=path) or {}).get("items", [])
+    return jsonify(**compare_combined(date.today(), days, lag, symptom, items,
+        lambda d: read_diary_offline(d, path=path),
+        lambda d: get(d, KEY, path=path)),
+        symptoms=[q for q, kind in QUESTIONS.items() if kind in ("severity", "sleep")])
+
+
 @health_api.get("/personal-insights")
 def personal_insights():
     from favourite_feed.health_personal_insights import summarize
