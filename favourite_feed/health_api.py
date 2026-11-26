@@ -68,6 +68,41 @@ def _backup_after_write(path):
         return False
 
 
+@health_api.route("/factors/<day>", methods=["GET", "POST"])
+def factors(day):
+    from favourite_feed.health_vault import get, put, delete
+    try:
+        if date.fromisoformat(day).isoformat() != day:
+            raise ValueError
+    except ValueError:
+        abort(400)
+    path = _vault_path()
+    question = "lifestyle-factors-v1"
+    if request.method == "GET":
+        return jsonify(items=(get(day, question, path=path) or {}).get("items", []))
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or set(payload) != {"items"}:
+        abort(400)
+    items = payload["items"]
+    if not isinstance(items, list) or len(items) > 20:
+        abort(400)
+    for item in items:
+        if not isinstance(item, dict) or set(item) != {"category", "name", "value"}:
+            abort(400)
+        if item["category"] not in ("Exercise", "Medication", "Supplement", "Stress", "Caffeine", "Alcohol", "Diet", "Other"):
+            abort(400)
+        if any(not isinstance(item[k], str) or not item[k].strip() or len(item[k]) > 100 for k in ("name", "value")):
+            abort(400)
+    try:
+        if items:
+            put(day, question, {"items": items}, path=path)
+        else:
+            delete(day, question, path=path)
+    except ValueError:
+        abort(400)
+    return jsonify(saved=len(items), backup_ok=_backup_after_write(path))
+
+
 @health_api.get("/session")
 def session():
     current = _valid_session()
