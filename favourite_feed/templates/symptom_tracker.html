@@ -6,7 +6,7 @@
 <body><header><h1>Perimenopause tracker</h1><nav>{% if private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 {% if storage_staging %}
-<div class="tracker-warning"><strong>Private test diary — fictional information only.</strong> Load a date before entering answers. Nothing is stored until you choose Save check-in. Free-text notes are not stored.</div>
+<div class="tracker-warning"><strong>Private test diary — fictional information only.</strong> Your selected date loads automatically before entering answers. Nothing is stored until you choose Save check-in. Free-text notes are not stored.</div>
 {% else %}
 <div class="tracker-warning"><strong>Design preview only — nothing is saved.</strong> Answers stay on this page temporarily. Leaving or refreshing clears them. Do not enter identifying or sensitive notes during testing.</div>
 {% endif %}
@@ -28,12 +28,12 @@
 <div id="quick-category" role="group" aria-label="Category"></div>
 <div id="quick-symptom" role="group" aria-label="Symptom or measurement"></div>
 <div id="quick-fields"></div>
-<button type="button" id="quick-add" class="tracker-primary">{% if storage_staging %}Add to today’s diary{% else %}Add to preview diary{% endif %}</button>
+<button type="button" id="quick-add" class="tracker-primary">{% if storage_staging %}Add to selected day’s diary{% else %}Add to preview diary{% endif %}</button>
 </section>
 {% if storage_staging %}
 <section id="staging-storage" aria-label="Private staging check-ins">
 <h2>My daily check-in</h2>
-<p>Choose a date, then select Load saved day to begin. You can revisit and edit earlier check-ins. This is still a fictional-data test environment.</p>
+<p>Today loads automatically. Choose another date to revisit it, or use Load saved day to retry. You can revisit and edit earlier check-ins. This is still a fictional-data test environment.</p>
 <label for="staging-day">Check-in date</label>
 <input id="staging-day" type="date" required>
 <div class="tracker-actions">
