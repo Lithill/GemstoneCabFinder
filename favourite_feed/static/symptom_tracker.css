@@ -11,3 +11,12 @@
 #staging-storage .tracker-actions button{min-height:44px;padding:10px 16px}
 .tracker-diary-item button{min-height:42px}
 @media(max-width:600px){#staging-storage{padding:16px}#staging-storage .tracker-actions{justify-content:stretch}#staging-storage .tracker-actions button{flex:1 1 100%}.tracker-diary-item{flex-wrap:wrap}}
+
+.insight-calendar {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:16px 0;text-align:center;align-items:center}
+.insight-calendar button {padding:8px 0;min-width:0;width:100%}
+.insight-calendar button.insight-recorded {background:#365f4b;color:white;border-color:#365f4b}
+.insight-chart {overflow-x:auto;margin-top:16px}
+.insight-plot {border-collapse:collapse;width:100%;min-width:680px;font-size:.85rem}
+.insight-plot th,.insight-plot td {border:1px solid #d5ddd6;text-align:center;padding:4px;min-width:18px}
+.insight-plot th[scope=row] {text-align:left;position:sticky;left:0;background:#fff}
+.insight-point {color:#365f4b;background:#e3eee6}
