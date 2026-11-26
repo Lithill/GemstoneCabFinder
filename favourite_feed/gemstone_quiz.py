@@ -587,7 +587,7 @@ def _identify_cached(title, custom):
 def options(name, seed, listing_id, available=None):
     """Return deterministic, shuffled multiple-choice options for a photo."""
     pool = set(GEMS) if available is None else set(available)
-    preferred = GEMS.get(name, ([], []))[1]
+    preferred = list(dict.fromkeys(GEMS.get(name, ([], []))[1] + visual_alternatives(name)))
     answers = [name] + list(dict.fromkeys(gem for gem in preferred if gem in pool and gem != name))
     answers.extend(gem for gem in preferred if gem not in answers and len(answers) < 4)
     rng = random.Random(int.from_bytes(hashlib.sha256(
@@ -600,7 +600,7 @@ def options(name, seed, listing_id, available=None):
     unique = [name]
     for gem in answers[1:] + remaining:
         key = material_info(gem)["primary"].casefold()
-        if key not in seen and len(unique) < 4:
+        if key not in seen and len(unique) < 4 and not any(overlapping(gem, other) for other in unique):
             unique.append(gem)
             seen.add(key)
     rng.shuffle(unique)
@@ -683,3 +683,44 @@ def material_info(name):
 def display_answer(name):
     info = material_info(name)
     return info["primary"] + (" (" + info["alternate"] + ")" if info["alternate"] else "")
+
+def material_category(name):
+    if name in MANMADE or name in COMPOSITE or name in TREATED:
+        return "manufactured"
+    if name in UNCERTAIN or name not in GEMS:
+        return "uncertain"
+    if name in ORGANIC:
+        return "organic"
+    return "natural"
+
+# Visual families provide relevant alternatives for entries without curated choices.
+VISUAL_FAMILIES = [
+    "Quartz|Clear quartz|White topaz|Goshenite|Danburite|Phenakite|Petalite|Euclase|Diamond|Clear fluorite|Herkimer diamond",
+    "Amethyst|Purple fluorite|Purple sapphire|Iolite|Tanzanite|Kunzite|Lepidolite|Charoite|Sugilite|Purpurite|Phosphosiderite|Lavender jade|Kammererite",
+    "Ruby|Red spinel|Garnet|Almandine|Pyrope|Rhodolite|Rubellite|Red tourmaline|Pink sapphire|Pink tourmaline|Morganite|Rhodonite|Rhodochrosite|Thulite|Eudialyte",
+    "Emerald|Chrome diopside|Diopside|Tsavorite|Demantoid|Uvarovite|Green tourmaline|Peridot|Green fluorite|Hiddenite|Kornerupine|Vesuvianite|Idocrase|Epidote|Dioptase|Atacamite",
+    "Citrine|Heliodor|Yellow topaz|Imperial topaz|Yellow sapphire|Yellow fluorite|Hessonite|Spessartine|Sphalerite|Titanite|Sphene|Amber|Fire opal|Carnelian",
+    "Aquamarine|Blue topaz|Blue zircon|Blue sapphire|Blue spinel|Indicolite|Paraiba tourmaline|Benitoite|Blue fluorite|Apatite|Kyanite|Iolite",
+    "Lapis lazuli|Sodalite|Lazulite|Lazurite|Azurite|Afghanite|Dumortierite|Cavansite|Shattuckite|Plancheite|Trolleite|Hackmanite",
+    "Turquoise|Chrysocolla|Variscite|Aquaprase|Gem silica|Larimar|Amazonite|Smithsonite|Hemimorphite|Ajoite|Pectolite",
+    "Jade|Jadeite|Nephrite|Serpentine|Prehnite|Chrysoprase|Prasiolite|Grossular|Wavellite|Mariposite|Fuchsite|Actinolite|Tremolite",
+    "Pyrite|Marcasite|Chalcopyrite|Bornite|Covellite|Galena|Hematite|Magnetite|Goethite|Cuprite|Limonite|Meteorite|Schalenblende",
+    "Obsidian|Black onyx|Jet|Shungite|Black tourmaline|Tektite|Moldavite|Libyan desert glass|Mahogany obsidian|Rainbow obsidian",
+    "Tiger's eye|Hawk's eye|Bronzite|Hypersthene|Enstatite|Pietersite|Binghamite|Nuummite|Astrophyllite|Arfvedsonite",
+    "Moonstone|Rainbow moonstone|Peach moonstone|Labradorite|Spectrolite|Larvikite|Feldspar|Orthoclase|Microcline|Sunstone|Opalite",
+    "Calcite|Aragonite|Dolomite|Magnesite|Howlite|Barite|Gypsum|Selenite|Ulexite|Celestite|Celestine|Natrolite|Scolecite|Stilbite|Heulandite|Apophyllite|Analcime|Thomsonite",
+    "Agate|Chalcedony|Banded agate|Botswana agate|Blue lace agate|Crazy lace agate|Onyx|Sardonyx|Plume agate|Moss agate|Dendritic agate|Dendritic opal",
+    "Jasper|Picture jasper|Mookaite jasper|Maligano jasper|Rhyolite|Ocean jasper|Kambaba jasper|Bumblebee jasper|Dalmatian jasper|Pinolith|Septarian|K2 granite|Yooperlite|Unakite|Bloodstone|Heliotrope",
+    "Opal|White opal|Black opal|Boulder opal|Ethiopian opal|Pink opal|Fire opal|Ammolite|Abalone|Mother of pearl|Aurora opal",
+    "Petrified wood|Petrified palm wood|Agatized dinosaur bone|Fossil coral agate|Crinoid fossil|Ammonite|Orthoceras|Turritella jasper",
+    "Rutilated quartz|Tourmalinated quartz|Lepidocrocite|Fire quartz|Super seven|Chlorite|Ajoite",
+    "Andalusite|Axinite|Smoky quartz|Scapolite|Staurolite|Chiastolite|Sillimanite|Spodumene|Beryl|Zircon",
+    "Muscovite|Biotite|Fuchsite|Lepidolite|Chlorite|Seraphinite",
+    "Fordite|Surfite|Rainbow calsilica|Spiny oyster turquoise|Mohave turquoise",
+]
+def visual_alternatives(name):
+    return list(dict.fromkeys(gem for family in VISUAL_FAMILIES for gem in family.split("|") if name in family.split("|") and gem != name and gem in GEMS))
+
+def overlapping(a, b):
+    a, b = material_info(a)["primary"].casefold(), material_info(b)["primary"].casefold()
+    return a == b or a in b.split() or b in a.split()
