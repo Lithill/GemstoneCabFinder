@@ -73,6 +73,13 @@
 {% if storage_staging %}
 <section id="factors-panel" hidden aria-label="Lifestyle and changes">
 <h2>Lifestyle &amp; changes</h2>
+<h3>Quick exercise check-in</h3>
+<label for="exercise-day">Date</label><input type="date" id="exercise-day">
+<p id="exercise-status" role="status"></p><div id="exercise-list"></div>
+<label for="exercise-type">Activity</label><select id="exercise-type"><option>Walking</option><option>Cardio</option><option>Strength</option><option>Yoga / Pilates</option><option>Other</option></select>
+<label for="exercise-minutes">Minutes</label><input type="number" id="exercise-minutes" min="1" max="1440" value="30">
+<label for="exercise-intensity">Intensity</label><select id="exercise-intensity"><option>Light</option><option selected>Moderate</option><option>High</option></select>
+<div class="tracker-actions"><button id="exercise-add" type="button" disabled>Save session</button><button id="exercise-rest" type="button" disabled>Record rest day</button><button id="exercise-clear" type="button" disabled>Clear exercise record</button></div>
 <h3>Ongoing factors</h3>
 <p>Set a status and dose once. Add a dated update only when it changes. This records your intended routine, not confirmed daily doses.</p>
 <div id="ongoing-list"></div><p id="ongoing-status" role="status"></p>
@@ -98,6 +105,12 @@
 {% if storage_staging %}
 <section id="impact-panel" hidden aria-label="Impact analysis">
 <h2>What seems to affect my symptoms?</h2>
+<h3>Exercise associations</h3>
+<label for="exercise-range">Look back</label><select id="exercise-range"><option>30</option><option>60</option><option>90</option></select>
+<label for="exercise-lag">Symptom timing</label><select id="exercise-lag"><option value="0">Same day</option><option value="1">Next day</option><option value="2">Two days later</option><option value="3">Three days later</option></select>
+<p id="exercise-impact-status" role="status"></p><div id="exercise-impact-results"></div>
+<p>Only explicitly recorded exercise and rest days are compared. Other activity and changes may influence later symptoms.</p>
+<h3>Ongoing change comparisons</h3>
 <p>Compare saved symptom ratings before and after a dated change. These are associations, not proof of benefit or harm.</p>
 <label for="impact-event">Recorded change</label><select id="impact-event"></select>
 <label for="impact-window">Days on each side</label><select id="impact-window"><option>7</option><option selected>14</option><option>30</option></select>
@@ -113,4 +126,5 @@
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_factors.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_ongoing.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_impact.js') }}" defer></script>{% endif %}
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_exercise.js') }}" defer></script>{% endif %}
 </body></html>
