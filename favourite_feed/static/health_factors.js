@@ -28,6 +28,7 @@
    finally {busy=false;render();}
  }
  tab.onclick=()=>{
+   el("impact-panel").hidden=true;el("impact-tab").setAttribute("aria-pressed","false");
    el("diary-panel").hidden=true;el("insights-panel").hidden=true;el("factors-panel").hidden=false;
    for(const id of ["diary-tab","insights-tab","factors-tab"]) el(id).setAttribute("aria-pressed",String(id==="factors-tab"));
    if(!loaded && !busy){day.value=el("staging-day").value;load();}
