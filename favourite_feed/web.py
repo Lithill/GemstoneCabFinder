@@ -11,7 +11,7 @@ import secrets
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
-from favourite_feed.gemstone_quiz import GEMS, canonical_name, clean_label, material_info, display_answer, identify as identify_quiz_gem, options as quiz_options
+from favourite_feed.gemstone_quiz import GEMS, canonical_name, clean_label, material_info, display_answer, material_category, identify as identify_quiz_gem, options as quiz_options
 from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
 app = Flask(__name__)
@@ -360,6 +360,8 @@ def gemstone_quiz():
                             AND i.image_url IS NOT NULL AND i.image_url != '')
             ORDER BY l.published_at DESC, l.listing_id DESC
         """).fetchall()
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_learning (name TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0, confident INTEGER NOT NULL DEFAULT 0, needs INTEGER NOT NULL DEFAULT 0)")
+        learning = {row[0]: (row[1], row[2], row[3]) for row in conn.execute("SELECT name, attempts, confident, needs FROM quiz_learning")}
     # Only quiz titles with one recognised gemstone; do not guess from photos.
     custom = tuple(sorted(custom))
     eligible = [(row, labels[row["listing_id"]] if row["listing_id"] in labels else identify_quiz_gem(row["title"], custom)) for row in rows]
@@ -383,6 +385,13 @@ def gemstone_quiz():
         excluded = {canonical_name(name) for name in prior.get("excluded", [])}
     enabled = known - excluded
     rows = [(row, gem) for row, gem in rows if gem in enabled]
+    mode = request.args.get("mode", "all")
+    if mode in {"natural", "organic", "manufactured", "uncertain"}:
+        rows = [(row, gem) for row, gem in rows if material_category(gem) == mode]
+    elif mode == "practice":
+        rows = [(row, gem) for row, gem in rows if learning.get(gem, (0, 0, 0))[2] > learning.get(gem, (0, 0, 0))[1]]
+    elif mode == "adaptive":
+        rows.sort(key=lambda pair: learning.get(pair[1], (0, 0, 0))[1] - learning.get(pair[1], (0, 0, 0))[2])
     total = len(rows)
     position = min(position, max(0, total - 1))
     item, answer = rows[position] if total else (None, None)
@@ -391,14 +400,61 @@ def gemstone_quiz():
     if example:
         item, answer = example
     practice_notice = bool(followup and not example)
+    choices = quiz_options(answer, seed, item["listing_id"], available & enabled) if item else []
     return render_template("gemstone_quiz.html",
                            item=item, answer=answer, material=material_info(answer), display_answer=display_answer, recognition_tip=GEMSTONE_TIPS.get(answer, ""),
-                           choices=quiz_options(answer, seed, item["listing_id"], available & enabled) if item else [],
+                           choices=choices, tips=GEMSTONE_TIPS, mode=mode, learning=learning.get(answer, (0, 0, 0)),
                            position=position, total=total, seed=seed,
                            gem_names=sorted(available), enabled=enabled, available=available,
                            review=review[:10] if request.args.get('review') == '1' else [], review_count=len(review),
                            review_open=request.args.get('review') == '1',
                            practice=bool(example), practice_notice=practice_notice)
+
+
+@app.post("/gemstone-quiz/learning")
+def gemstone_quiz_learning():
+    data = request.get_json(silent=True) or {}
+    name = data.get("name")
+    rating = data.get("rating")
+    if not isinstance(name, str) or not name or len(name) > 100 or rating not in {"knew", "guess", "practice"}:
+        abort(400)
+    with connect_database() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_learning (name TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0, confident INTEGER NOT NULL DEFAULT 0, needs INTEGER NOT NULL DEFAULT 0)")
+        conn.execute("INSERT OR IGNORE INTO quiz_learning(name) VALUES (?)", (name,))
+        conn.execute("UPDATE quiz_learning SET attempts=attempts+1, confident=confident+?, needs=needs+? WHERE name=?", (int(rating == "knew"), int(rating != "knew"), name))
+    return jsonify(ok=True)
+
+
+@app.post("/gemstone-quiz/questionable/<int:listing_id>")
+def gemstone_quiz_questionable(listing_id):
+    name = " ".join(request.form.get("name", "").split())
+    if len(name) > 100:
+        abort(400)
+    with connect_database() as conn:
+        if not conn.execute("SELECT 1 FROM listings WHERE listing_id=? AND seen_at IS NOT NULL", (listing_id,)).fetchone():
+            abort(404)
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_labels (listing_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+        conn.execute("INSERT OR REPLACE INTO quiz_labels VALUES (?, ?)", (listing_id, canonical_name(name) if name else ""))
+    return redirect(url_for("gemstone_quiz"))
+
+
+@app.get("/gemstone-library")
+def gemstone_library():
+    query = request.args.get("q", "").strip().casefold()
+    with connect_database() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS quiz_labels (listing_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+        labels = dict(conn.execute("SELECT listing_id, name FROM quiz_labels"))
+        rows = conn.execute("""SELECT l.listing_id, l.title, (SELECT image_url FROM listing_images i WHERE i.listing_id=l.listing_id AND i.image_url IS NOT NULL AND i.image_url != '' ORDER BY image_rank LIMIT 1) FROM listings l WHERE l.seen_at IS NOT NULL ORDER BY l.published_at DESC""").fetchall()
+    custom = tuple(sorted({name for name in labels.values() if name}))
+    photos = {}
+    for listing_id, title, photo in rows:
+        if photo:
+            name = labels.get(listing_id) if listing_id in labels else identify_quiz_gem(title, custom)
+            if name:
+                photos.setdefault(name, photo)
+    names = sorted(set(GEMS) | set(custom))
+    entries = [(name, material_info(name), photos.get(name), GEMSTONE_TIPS.get(name, ""), GEMS.get(name, ([], []))[1]) for name in names if not query or query in (name + " " + display_answer(name)).casefold()]
+    return render_template("gemstone_library.html", entries=entries, query=query, display_answer=display_answer)
 
 
 @app.post("/gemstone-quiz/settings")
