@@ -105,6 +105,11 @@
 {% if storage_staging %}
 <section id="impact-panel" hidden aria-label="Impact analysis">
 <h2>What seems to affect my symptoms?</h2>
+<h3>My personal insights</h3>
+<p>Automatic summary of the last 30 symptom days for exercise (same day to three days later), and 14 days either side of up to five recent ongoing changes within 90 days. These patterns do not establish causes.</p>
+<button type="button" id="personal-insights-refresh">Refresh personal insights</button>
+<p id="personal-insights-status" role="status"></p>
+<div id="personal-insights-results"></div>
 <h3>Exercise associations</h3>
 <label for="exercise-range">Look back</label><select id="exercise-range"><option>30</option><option>60</option><option>90</option></select>
 <label for="exercise-lag">Symptom timing</label><select id="exercise-lag"><option value="0">Same day</option><option value="1">Next day</option><option value="2">Two days later</option><option value="3">Three days later</option></select>
@@ -127,4 +132,5 @@
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_ongoing.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_impact.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_exercise.js') }}" defer></script>{% endif %}
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_personal_insights.js') }}" defer></script>{% endif %}
 </body></html>
