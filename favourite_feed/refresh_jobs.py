@@ -85,7 +85,7 @@ def step():
         before = conn.execute("SELECT COUNT(*) FROM listings WHERE shop_id=?", (pending["shop_id"],)).fetchone()[0]
     error = None
     try:
-        message = refresh_shop(shop)
+        message = refresh_shop(shop) if shop['is_active'] else 'Skipped paused shop'
     except Exception as exc:
         error = str(exc)[:300]
         message = error
@@ -93,6 +93,10 @@ def step():
         conn.execute("BEGIN IMMEDIATE")
         after = conn.execute("SELECT COUNT(*) FROM listings WHERE shop_id=?", (pending["shop_id"],)).fetchone()[0]
         count = max(0,after-before)
+        if error and ("rate limit" in error.lower() or "429" in error):
+            conn.execute("UPDATE refresh_run_shops SET status='pending',claimed_at=NULL,message=? WHERE run_id=? AND position=?",(error,run["run_id"],pending["position"]))
+            conn.execute("UPDATE refresh_runs SET status='paused',error=?,new_listings=new_listings+? WHERE run_id=?",(error,count,run["run_id"]))
+            return snapshot_after(conn,run["run_id"])
         conn.execute("UPDATE refresh_run_shops SET status=?,message=?,new_listings=? WHERE run_id=? AND position=?",
                      ("failed" if error else "done",message,count,run["run_id"],pending["position"]))
         rate_limited = bool(error and ("rate limit" in error.lower() or "429" in error))
@@ -100,7 +104,7 @@ def step():
             baselines=baselines+?, failures=failures+?,last_shop=?,
             status=CASE WHEN ? THEN 'paused' ELSE status END,
             error=CASE WHEN ? THEN ? ELSE error END WHERE run_id=?""",
-            (count,int(not error and not shop["last_checked"]),int(bool(error)),
+            (count,int(not error and shop["is_active"] and not shop["last_checked"]),int(bool(error)),
              shop["shop_name"],int(rate_limited),int(rate_limited),error,run["run_id"]))
         remaining = conn.execute("SELECT 1 FROM refresh_run_shops WHERE run_id=? AND status IN ('pending','working') LIMIT 1", (run["run_id"],)).fetchone()
         if not remaining:
