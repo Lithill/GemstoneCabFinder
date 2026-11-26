@@ -107,9 +107,7 @@ def review(sid, action):
     if not row:
         raise ValueError("Shop is no longer awaiting review.")
     if action=="favourite":
-        actual,_=add_shop(row["name"])
-        if actual!=sid:
-            raise ValueError("Shop identity changed.")
+        add_shop(row["name"], expected_id=sid)
     elif action!="reject":
         raise ValueError("Unknown review action.")
     with connect_database() as conn:
