@@ -195,6 +195,17 @@ def exercise_recovery(days, lag, mode):
         symptoms=[q for q, kind in QUESTIONS.items() if kind in ("severity", "sleep")])
 
 
+@health_api.get("/cycle-impact/<int:days>")
+def cycle_impact(days):
+    from favourite_feed.health_cycle import compare_cycle
+    symptom = request.args.get("symptom", "Fibromyalgia pain")
+    if days not in (30, 60, 90) or QUESTIONS.get(symptom) not in ("severity", "sleep"):
+        abort(400)
+    path = _vault_path()
+    result = compare_cycle(date.today(), days, symptom, lambda d: read_diary_offline(d, path=path))
+    return jsonify(**result, symptoms=[q for q, kind in QUESTIONS.items() if kind in ("severity", "sleep")])
+
+
 @health_api.get("/personal-insights")
 def personal_insights():
     from favourite_feed.health_personal_insights import summarize
