@@ -10,7 +10,7 @@
 <p>New finds from your favourite Etsy shops.</p>
 <div class="dashboard-stats"><span><strong>{{ counts.unseen }}</strong> unseen</span><span><strong>{{ liked }}</strong> favourites</span><span><strong>{{ active_shops }}</strong> shops</span></div>
 <p class="dashboard-refresh"><strong>Refresh:</strong> {% if refresh_status.status == 'never' %}Not yet recorded{% else %}{{ refresh_status.status|capitalize }} · {{ refresh_status.done }}/{{ refresh_status.total }} shops{% if refresh_status.finished_at %}<span> · <time id="finished" datetime="{{ refresh_status.finished_at }}"></time></span>{% endif %}{% endif %}</p>
-<div class="dashboard-links"><a class="dashboard-primary" href="/">Open feed</a><a href="/?view=swipe">Swipe</a><a href="/refresh">Refresh shops</a><a href="/favourite-shops">Manage favourite shops</a></div>
+<div class="dashboard-links"><a class="dashboard-primary" href="/">Open feed</a><a href="/?view=swipe">Swipe</a><a href="/refresh">Refresh shops</a><a href="/favourite-shops">Manage favourite shops</a><a href="/discover">Discover gemstone sellers</a></div>
 </article>
 <article class="dashboard-card">
 <div class="dashboard-symbol" aria-hidden="true">🌿</div>
