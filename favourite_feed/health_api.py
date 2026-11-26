@@ -206,6 +206,25 @@ def cycle_impact(days):
     return jsonify(**result, symptoms=[q for q, kind in QUESTIONS.items() if kind in ("severity", "sleep")])
 
 
+@health_api.get("/report/<int:days>")
+def health_report(days):
+    from flask import render_template, make_response
+    from favourite_feed.health_report import build_report
+    from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION
+    from favourite_feed.health_exercise import KEY
+    from favourite_feed.health_vault import get
+    if days not in (30, 90, 180):
+        abort(400)
+    path = _vault_path()
+    items = (get(KEY_DAY, KEY_QUESTION, path=path) or {}).get("items", [])
+    report = build_report(date.today(), days, items,
+        lambda d: read_diary_offline(d, path=path),
+        lambda d: get(d, KEY, path=path))
+    response = make_response(render_template("health_report.html", report=report))
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    return response
+
+
 @health_api.get("/review/<int:days>")
 def period_review(days):
     from favourite_feed.health_review import review
