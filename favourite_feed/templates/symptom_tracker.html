@@ -135,6 +135,14 @@
 <button type="button" id="cycle-load">Show cycle comparisons</button>
 <p id="cycle-status" role="status"></p><div id="cycle-results"></div>
 <p>Period starts use explicitly entered start dates or a recorded period immediately following a recorded no-bleeding day. Other comparisons require an explicit no-bleeding answer. The week after means after the start, not the end. Overlapping windows are excluded; unknown bleeding days are excluded. No ovulation or hormone phase is inferred.</p>
+<h3>Combined influencing factors</h3>
+<p>Compare exercise and rest within the same recorded bleeding category on the symptom day, separating days near recorded medication or supplement changes.</p>
+<label for="combined-symptom">Symptom</label><select id="combined-symptom"><option>Fibromyalgia pain</option><option>Fatigue / lacking in energy</option></select>
+<label for="combined-days">Look back</label><select id="combined-days"><option>30</option><option>60</option><option selected>90</option></select>
+<label for="combined-lag">Symptom timing</label><select id="combined-lag"><option value="0">Same day</option><option value="1" selected>Next day</option><option value="2">Two days later</option><option value="3">Three days later</option></select>
+<button type="button" id="combined-load">Compare influencing factors</button>
+<p id="combined-status" role="status"></p><div id="combined-results"></div>
+<p>A recent change means a recorded medication or supplement event within 14 days before exercise/rest through the symptom day. No recent recorded change does not guarantee an unchanged regimen or adherence. This is not a statistical adjustment for all confounders; other activity, sleep, symptoms and unrecorded changes can affect comparisons.</p>
 <h3>Ongoing change comparisons</h3>
 <p>Compare saved symptom ratings before and after a dated change. These are associations, not proof of benefit or harm.</p>
 <label for="impact-event">Recorded change</label><select id="impact-event"></select>
@@ -156,4 +164,5 @@
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_recovery.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_cycle.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_review.js') }}" defer></script>{% endif %}
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_combined.js') }}" defer></script>{% endif %}
 </body></html>
