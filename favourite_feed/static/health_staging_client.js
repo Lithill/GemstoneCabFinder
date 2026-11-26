@@ -11,7 +11,8 @@
   const modeSections = [document.getElementById("guided"), document.getElementById("quick")];
   function lockEditing(locked) {
     modeButtons.forEach(button => { button.disabled = locked; });
-    modeSections.forEach(section => { if (locked) section.hidden = true; });
+    modeSections.forEach(section => { section.inert = locked || busy; if (locked && !busy) section.hidden = true; });
+    document.getElementById("diary-items").inert = locked || busy;
     document.getElementById("clear-diary").disabled = locked;
     saveButton.disabled = locked || busy;
   }
@@ -37,10 +38,14 @@
   document.addEventListener("tracker:diary-changed", refreshDirty);
   dateInput.addEventListener("change", () => {
     if (busy) return;
+    if (dirty && loadedDay !== dateInput.value && !confirm("Discard unsaved changes and switch dates?")) {
+      dateInput.value = loadedDay;
+      return;
+    }
     if (loadedDay !== dateInput.value) {
       lockEditing(true);
-      show("Date changed. Load the selected day before entering or saving answers.");
-      setDirty(dirty);
+      show("Loading selected day…");
+      loadDay(true);
     } else {
       lockEditing(false);
       setDirty(dirty);
@@ -49,7 +54,7 @@
   async function sessionToken() {
     if (csrf) return csrf;
     const response = await fetch("/private-health-api/session", {credentials:"same-origin", cache:"no-store"});
-    if (!response.ok) throw new Error("Your private session has expired. Please sign in again.");
+    if (!response.ok) throw new Error("Your private session has expired. Keep this tab open and sign in again in a separate tab, then retry.");
     csrf = (await response.json()).csrf;
     return csrf;
   }
@@ -65,7 +70,7 @@
     });
     if (response.status === 401 || response.status === 403) {
       csrf = null;
-      throw new Error("Session expired or security check failed. Please sign in again.");
+      throw new Error("Session expired or security check failed. Keep this tab open, sign in again in a separate tab, then retry. Your entries remain here.");
     }
     if (!response.ok) throw new Error("The check-in could not be processed (" + response.status + ").");
     return response.json();
@@ -73,6 +78,7 @@
   async function run(task) {
     if (busy) return;
     busy = true;
+    lockEditing(true);
     saveButton.disabled = true;
     loadButton.disabled = true;
     dateInput.disabled = true;
@@ -80,6 +86,7 @@
       if (!dateInput.value) throw new Error("Choose a date first.");
       await task(dateInput.value);
     } catch (error) {
+      if (loadedDay && loadedDay !== dateInput.value) dateInput.value = loadedDay;
       show(error.message || "The operation failed.");
     } finally {
       busy = false;
@@ -122,8 +129,8 @@
     setDirty(false);
     show("Saved " + result.saved + " answers for " + day + ". Existing answers not shown here remain saved.");
   }));
-  loadButton.addEventListener("click", () => run(async day => {
-    if (dirty && !confirm("Discard your unsaved changes and load the saved answers for this date?")) return;
+  function loadDay(confirmed = false) { return run(async day => {
+    if (dirty && !confirmed && !confirm("Discard your unsaved changes and load the saved answers for this date?")) return;
     const result = await api("checkin/" + encodeURIComponent(day), "GET");
     replaceDiary(result.entries);
     loadedDay = day;
@@ -131,13 +138,15 @@
     setDirty(false);
     lockEditing(false);
     show("Loaded " + result.entries.length + " answers for " + day + ". You can now edit and save.");
-  }));
+  }); }
+  loadButton.addEventListener("click", () => loadDay());
   window.addEventListener("beforeunload", event => {
     if (!dirty) return;
     event.preventDefault();
     event.returnValue = "";
   });
   lockEditing(true);
-  show("Select Load saved day to unlock the diary for this date.");
+  show("Loading today’s diary…");
   setDirty(false);
+  loadDay();
 })();
