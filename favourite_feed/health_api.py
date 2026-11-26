@@ -180,6 +180,19 @@ def exercise_impact(days, lag):
         lambda d: read_diary_offline(d, path=path)))
 
 
+@health_api.get("/personal-insights")
+def personal_insights():
+    from favourite_feed.health_personal_insights import summarize
+    from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION
+    from favourite_feed.health_exercise import KEY
+    from favourite_feed.health_vault import get
+    path = _vault_path()
+    items = (get(KEY_DAY, KEY_QUESTION, path=path) or {}).get("items", [])
+    return jsonify(summarize(date.today(), items,
+        lambda d: read_diary_offline(d, path=path),
+        lambda d: get(d, KEY, path=path)))
+
+
 @health_api.get("/session")
 def session():
     current = _valid_session()
