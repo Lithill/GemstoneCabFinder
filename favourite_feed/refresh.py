@@ -23,6 +23,32 @@ def inclusion_reason(item, baseline, cutoff, upper):
     return "older original creation; no matching activation (possible renewal)"
 
 
+def store_listing(shop_id, item, published_at, started):
+    listing_id = item["listing_id"]
+    images = etsy_get(f"listings/{listing_id}/images")["results"]
+    price = item.get("price") or {}
+    with connect_database() as conn:
+        result = conn.execute("""
+            INSERT INTO listings (listing_id, shop_id, title, description,
+                listing_url, price_amount, price_divisor, currency_code,
+                published_at, discovered_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(listing_id) DO NOTHING
+        """, (listing_id, shop_id, html.unescape(item["title"]),
+              html.unescape(item.get("description") or ""), item.get("url"),
+              price.get("amount"), price.get("divisor"), price.get("currency_code"),
+              published_at, started.isoformat()))
+        if result.rowcount:
+            for image in images:
+                url = image.get("url_fullxfull") or image.get("url_570xN")
+                if url:
+                    conn.execute("""INSERT OR IGNORE INTO listing_images
+                        (image_id, listing_id, image_url, image_rank) VALUES (?, ?, ?, ?)""",
+                        (image["listing_image_id"], listing_id, url, image.get("rank")))
+            return 1
+    return 0
+
+
 def refresh_shop(shop):
     shop_id = shop["shop_id"]
     started = datetime.now(timezone.utc)
@@ -69,27 +95,8 @@ def refresh_shop(shop):
         reason = inclusion_reason(item, baseline_ts, cutoff, upper)
         if listing_id in known or reason.startswith(("outside", "older")):
             continue
-        images = etsy_get(f"listings/{listing_id}/images")["results"]
-        price = item.get("price") or {}
-        with connect_database() as conn:
-            result = conn.execute("""
-                INSERT INTO listings (listing_id, shop_id, title, description,
-                    listing_url, price_amount, price_divisor, currency_code,
-                    published_at, discovered_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(listing_id) DO NOTHING
-            """, (listing_id, shop_id, html.unescape(item["title"]),
-                  html.unescape(item.get("description") or ""), item.get("url"),
-                  price.get("amount"), price.get("divisor"), price.get("currency_code"),
-                  item["state_timestamp"] if int(item.get("original_creation_timestamp") or 0) < baseline_ts else item["original_creation_timestamp"], started.isoformat()))
-            if result.rowcount:
-                for image in images:
-                    url = image.get("url_fullxfull") or image.get("url_570xN")
-                    if url:
-                        conn.execute("""INSERT OR IGNORE INTO listing_images
-                            (image_id, listing_id, image_url, image_rank) VALUES (?, ?, ?, ?)""",
-                            (image["listing_image_id"], listing_id, url, image.get("rank")))
-                new_count += 1
+        published_at = item["state_timestamp"] if int(item.get("original_creation_timestamp") or 0) < baseline_ts else item["original_creation_timestamp"]
+        new_count += store_listing(shop_id, item, published_at, started)
     with connect_database() as conn:
         conn.execute("UPDATE monitored_shops SET last_checked=? WHERE shop_id=?",
                      (started.isoformat(), shop_id))
