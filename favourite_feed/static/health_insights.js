@@ -29,6 +29,7 @@
   function draw() {
     calendar.replaceChildren();
     chart.replaceChildren();
+    document.getElementById("insight-context").replaceChildren();
     if (!data) return;
     const [year, m] = month.value.split("-").map(Number);
     const count = new Date(year, m, 0).getDate();
@@ -58,7 +59,44 @@
         }
       }
     }
+    const context = data.timeline || {};
+    const contextRows = [
+      ["Exercise", d => {
+        const log = d.exercise;
+        if (!log) return ["", "Exercise not recorded"];
+        if (log.rest) return ["R", "Recorded rest day"];
+        if (!log.sessions.length) return ["", "Exercise not recorded"];
+        return [String(log.sessions.reduce((n,s)=>n+s.minutes,0)), log.sessions.map(s=>s.activity+" "+s.minutes+" min ("+s.intensity+")").join("; ")];
+      }],
+      ["Bleeding", d => [({None:"–",Period:"P",Spotting:"S",Unexpected:"U"})[d.period] || "", d.period===null?"Bleeding not recorded":d.period]],
+      ["Changes", d => [d.changes.length?String(d.changes.length):"",d.changes.map(e=>e.name+" — "+e.status+" "+e.dose).join("; ")]]
+    ];
+    for (const [label, describe] of contextRows) {
+      const row=table.insertRow();const th=document.createElement("th");th.scope="row";th.textContent=label;row.append(th);
+      for(let i=1;i<=count;i++){
+        const date=month.value+"-"+String(i).padStart(2,"0"),cell=row.insertCell();
+        const d=context[date];if(!d)continue;
+        const [mark,detail]=describe(d);
+        cell.textContent=mark;cell.title=detail;cell.setAttribute("aria-label",date+": "+(detail||"No dated change"));
+        if(mark)cell.className="insight-point";
+      }
+    }
     chart.append(table);
+    const detailBox=document.getElementById("insight-context");
+    detailBox.replaceChildren();
+    function add(parent,tag,value){const node=document.createElement(tag);node.textContent=value;parent.append(node);return node;}
+    add(detailBox,"h3","Ongoing factors at start of month");
+    if(!(data.baseline||[]).length)add(detailBox,"p","No ongoing factor recorded as of the first day.");
+    for(const e of data.baseline||[])add(detailBox,"p",e.name+" — "+e.status+" "+e.dose+" (since "+e.day+")");
+    add(detailBox,"h3","Recorded changes and activity");
+    for(const [date,d] of Object.entries(context).sort((a,b)=>a[0].localeCompare(b[0]))){
+      const lines=[];
+      if(d.exercise)lines.push(contextRows[0][1](d)[1]);
+      if(d.period&&d.period!=="None")lines.push("Bleeding: "+d.period);
+      for(const e of d.changes)lines.push(e.name+" — "+e.status+" "+e.dose);
+      if(lines.length){const block=add(detailBox,"details","");add(block,"summary",date+" · "+lines.length+" recorded item(s)");for(const line of lines)add(block,"p",line);}
+    }
+
     for (let i=1;i<=count;i++) {
       const date = month.value + "-" + String(i).padStart(2,"0");
       const entry = data.days[date];
