@@ -5,6 +5,9 @@ Do not enable on production before privacy/security review and explicit approval
 """
 import os
 from pathlib import Path
+from datetime import date
+from calendar import monthrange
+from favourite_feed.health_answers import QUESTIONS
 
 from flask import Blueprint, abort, jsonify, request, current_app
 
@@ -69,6 +72,28 @@ def _backup_after_write(path):
 def session():
     current = _valid_session()
     return jsonify(csrf=current["csrf"])
+
+
+@health_api.get("/month/<month>")
+def read_month(month):
+    try:
+        first = date.fromisoformat(month + "-01")
+        if first.strftime("%Y-%m") != month:
+            raise ValueError
+    except ValueError:
+        abort(400)
+    path = _vault_path()
+    days = {}
+    for n in range(1, monthrange(first.year, first.month)[1] + 1):
+        day = first.replace(day=n).isoformat()
+        entries = read_diary_offline(day, path=path)
+        if entries:
+            days[day] = {"count": len(entries), "severity": {
+                e["name"]: e["answer"] for e in entries
+                if QUESTIONS[e["name"]] in {"severity", "sleep"}
+            }}
+    return jsonify(days=days, symptoms=[q for q, kind in QUESTIONS.items()
+                                      if kind in {"severity", "sleep"}])
 
 
 @health_api.get("/checkin/<day>")
