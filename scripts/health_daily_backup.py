@@ -1,5 +1,7 @@
 """Offline daily backup; run with the vault key in the private environment."""
 import argparse
+import tempfile
+import fcntl
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os
@@ -13,7 +15,7 @@ def private(path, directory=False):
     if not expected(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077 or (not directory and info.st_nlink != 1):
         raise RuntimeError("Unsafe private file or directory")
 
-def rotate(vault, folder, now=None):
+def rotate(vault, folder, now=None, refresh=False):
     now = now or datetime.now(timezone.utc)
     vault, folder = Path(vault).expanduser(), Path(folder).expanduser()
     private(vault.parent, True)
@@ -22,8 +24,26 @@ def rotate(vault, folder, now=None):
         raise RuntimeError("Backup directory must be inside the private vault directory")
     folder.mkdir(mode=0o700, exist_ok=True)
     private(folder, True)
+    lock = folder / '.rotation.lock'
+    fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'rb') as handle:
+        private(lock)
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        return _rotate_locked(vault, folder, now, refresh)
+
+
+def _rotate_locked(vault, folder, now, refresh):
     target = folder / ("health-" + now.strftime("%Y-%m-%d") + ".enc")
-    if not target.exists():
+    if target.exists():
+        private(target)
+    if refresh:
+        with tempfile.TemporaryDirectory(dir=folder) as tmp:
+            candidate = Path(tmp) / 'snapshot.enc'
+            encrypted_backup(candidate, vault)
+            private(candidate)
+            verify_backup(candidate)
+            os.replace(candidate, target)
+    elif not target.exists():
         encrypted_backup(target, vault)
     private(target)
     verify_backup(target)
