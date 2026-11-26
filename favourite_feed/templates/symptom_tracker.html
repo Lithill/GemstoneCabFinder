@@ -67,7 +67,9 @@
 <label for="insight-symptom">Symptom severity</label>
 <select id="insight-symptom"></select>
 <div id="insight-chart" class="insight-chart" tabindex="0" aria-label="Monthly severity chart"></div>
-<p>Scroll across the chart to see every day. None means explicitly recorded as none, not missing data.</p>
+<p>Scroll across the combined timeline to see every day. Blank severity cells mean no rating at that level; a blank column means no symptom rating. Exercise numbers are total minutes; R means recorded rest. Bleeding: P = period, S = spotting, U = unexpected, – = explicitly none. Changes shows the number of dated ongoing changes. Blank activity or bleeding cells mean not recorded.</p>
+<div id="insight-context" aria-label="Monthly lifestyle context"></div>
+<p>Timing can suggest associations, but does not establish what caused a symptom change.</p>
 </section>
 {% endif %}
 {% if storage_staging %}
