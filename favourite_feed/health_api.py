@@ -124,6 +124,27 @@ def ongoing():
     return jsonify(saved=len(items), backup_ok=_backup_after_write(path))
 
 
+@health_api.get("/impact/<day>/<int:window>")
+def impact(day, window):
+    from datetime import timedelta
+    from favourite_feed.health_impact import compare
+    from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION
+    from favourite_feed.health_vault import get
+    try:
+        change = date.fromisoformat(day)
+        if change.isoformat() != day or window not in (7, 14, 30):
+            raise ValueError
+        start, end = change - timedelta(days=window), change + timedelta(days=window)
+    except (ValueError, OverflowError):
+        abort(400)
+    path = _vault_path()
+    items = (get(KEY_DAY, KEY_QUESTION, path=path) or {}).get("items", [])
+    events = [{"name": item["name"], **event} for item in items for event in item["history"]
+              if start.isoformat() <= event["day"] <= end.isoformat()]
+    rows = compare(change, window, date.today(), lambda d: read_diary_offline(d, path=path))
+    return jsonify(rows=rows, events=events)
+
+
 @health_api.get("/session")
 def session():
     current = _valid_session()
