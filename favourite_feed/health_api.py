@@ -216,6 +216,9 @@ def session():
 
 @health_api.get("/month/<month>")
 def read_month(month):
+    from favourite_feed.health_vault import get
+    from favourite_feed.health_exercise import KEY
+    from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION, effective
     try:
         first = date.fromisoformat(month + "-01")
         if first.strftime("%Y-%m") != month:
@@ -223,7 +226,8 @@ def read_month(month):
     except ValueError:
         abort(400)
     path = _vault_path()
-    days = {}
+    days, timeline = {}, {}
+    items = (get(KEY_DAY, KEY_QUESTION, path=path) or {}).get("items", [])
     for n in range(1, monthrange(first.year, first.month)[1] + 1):
         day = first.replace(day=n).isoformat()
         entries = read_diary_offline(day, path=path)
@@ -232,8 +236,14 @@ def read_month(month):
                 e["name"]: e["answer"] for e in entries
                 if QUESTIONS[e["name"]] in {"severity", "sleep"}
             }}
-    return jsonify(days=days, symptoms=[q for q, kind in QUESTIONS.items()
-                                      if kind in {"severity", "sleep"}])
+        log = get(day, KEY, path=path)
+        period = next((e["answer"] for e in entries if e["name"] == "Period / bleeding today"), None)
+        changes = [{"name": item["name"], **event} for item in items for event in item["history"] if event["day"] == day]
+        timeline[day] = {"exercise": log, "period": period, "changes": changes}
+    baseline = [{"name": item["name"], **event} for item in items
+                for event in [effective(item, first.isoformat())] if event is not None]
+    return jsonify(days=days, timeline=timeline, baseline=baseline,
+                   symptoms=[q for q, kind in QUESTIONS.items() if kind in {"severity", "sleep"}])
 
 
 @health_api.get("/checkin/<day>")
