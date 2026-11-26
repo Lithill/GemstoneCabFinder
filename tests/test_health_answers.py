@@ -7,7 +7,7 @@ from favourite_feed.health_answers import QUESTIONS, validate_entry
 class SymptomAnswerTests(unittest.TestCase):
     def test_all_current_question_types_are_covered(self):
         self.assertEqual(set(QUESTIONS.values()), {"yesno", "period", "date", "severity", "sleep", "uti", "libido", "weight"})
-        self.assertEqual(len(QUESTIONS), 36)
+        self.assertEqual(len(QUESTIONS), 37)
 
     def test_valid_answers_are_canonical_and_do_not_mutate_input(self):
         samples = [
