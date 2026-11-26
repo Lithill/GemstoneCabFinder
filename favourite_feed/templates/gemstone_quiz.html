@@ -98,7 +98,7 @@ buttons.forEach(button => button.addEventListener('click', () => {
   photo.hidden = true;
   choices.hidden = true;
   answerPanel.hidden = false;
-  if (!correct && recognitionTip) recognitionTip.hidden = false;
+  if (recognitionTip) recognitionTip.hidden = false;
 }));
 let statusBusy=false;
 async function showRefresh(){
