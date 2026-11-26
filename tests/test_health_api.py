@@ -79,6 +79,28 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         self.assertEqual(self.client.get(endpoint).status_code, 401)
         self.assertEqual(self.client.post(endpoint, json={"entries":[]}, headers=headers).status_code, 401)
 
+    def test_month_timeline_private_and_distinguishes_missing(self):
+        endpoint = "/private-health-api/month/2026-02"
+        self.assertEqual(self.client.get(endpoint).status_code, 401)
+        self.login()
+        health_vault.put("2026-02-02", "exercise-log-v1", {"rest": True, "sessions": []}, path=self.path)
+        health_vault.put("2026-02-03", "Period / bleeding today", {"answer": "None"}, path=self.path)
+        health_vault.put("0001-01-01", "ongoing-factors-v1", {"items": [
+            {"name":"Example habit","category":"Other","history":[
+                {"day":"2026-01-01","status":"Ongoing","dose":""},
+                {"day":"2026-02-04","status":"Stopped","dose":""}]}]}, path=self.path)
+        response = self.client.get(endpoint)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        data = response.json
+        self.assertEqual(len(data["timeline"]), 28)
+        self.assertIsNone(data["timeline"]["2026-02-01"]["exercise"])
+        self.assertTrue(data["timeline"]["2026-02-02"]["exercise"]["rest"])
+        self.assertEqual(data["timeline"]["2026-02-03"]["period"], "None")
+        self.assertEqual(data["baseline"][0]["status"], "Ongoing")
+        self.assertEqual(data["timeline"]["2026-02-04"]["changes"][0]["status"], "Stopped")
+        self.assertNotIn("2026-02-02", data["days"])
+
     def test_invalid_submission_does_not_partially_save(self):
         csrf = self.login()
         response = self.client.post("/private-health-api/checkin/2026-11-21", headers={"X-Health-CSRF":csrf},
