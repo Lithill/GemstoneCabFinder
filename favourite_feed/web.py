@@ -11,7 +11,7 @@ import secrets
 from favourite_feed.currency import price_context, update_rates
 from favourite_feed.refresh import refresh_shop
 from favourite_feed import database, refresh_jobs
-from favourite_feed.gemstone_quiz import GEMS, canonical_name, clean_label, identify as identify_quiz_gem, options as quiz_options
+from favourite_feed.gemstone_quiz import GEMS, canonical_name, clean_label, material_info, display_answer, identify as identify_quiz_gem, options as quiz_options
 from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
 app = Flask(__name__)
@@ -392,7 +392,7 @@ def gemstone_quiz():
         item, answer = example
     practice_notice = bool(followup and not example)
     return render_template("gemstone_quiz.html",
-                           item=item, answer=answer, recognition_tip=GEMSTONE_TIPS.get(answer, ""),
+                           item=item, answer=answer, material=material_info(answer), display_answer=display_answer, recognition_tip=GEMSTONE_TIPS.get(answer, ""),
                            choices=quiz_options(answer, seed, item["listing_id"], available & enabled) if item else [],
                            position=position, total=total, seed=seed,
                            gem_names=sorted(available), enabled=enabled, available=available,
