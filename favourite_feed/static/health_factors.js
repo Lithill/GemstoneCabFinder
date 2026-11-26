@@ -40,7 +40,7 @@
  el("factor-save").onclick=async()=>{
    if(name.value || value.value){status.textContent="Add your unfinished entry before saving.";return;}
    busy=true;render();status.textContent="Saving…";
-   try {const session=await api("session");const result=await api("factors/"+encodeURIComponent(loaded),{method:"POST",headers:{"Content-Type":"application/json","X-CSRF-Token":session.csrf},body:JSON.stringify({items})});dirty=false;status.textContent=result.backup_ok===false?"Saved, but encrypted backup failed. Save again to retry.":"Factors saved";}
+   try {const session=await api("session");const result=await api("factors/"+encodeURIComponent(loaded),{method:"POST",headers:{"Content-Type":"application/json","X-Health-CSRF":session.csrf},body:JSON.stringify({items})});dirty=false;status.textContent=result.backup_ok===false?"Saved, but encrypted backup failed. Save again to retry.":"Factors saved";}
    catch(_){status.textContent="Could not save. Your entries are still on screen.";}
    finally{busy=false;render();}
  };
