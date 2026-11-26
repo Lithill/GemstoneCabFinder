@@ -14,7 +14,7 @@ const groups = [
     ["Brain fog","severity"],["Difficulty concentrating / loss of concentration","severity"],["Fatigue / lacking in energy","severity"],["Difficulty sleeping / insomnia","sleep"]
   ]},
   {name:"Physical symptoms",items:[
-    ["Bloating","severity"],["Breathing difficulties","severity"],["Digestive problems","severity"],["Feeling dizzy or faint","severity"],["Headaches","severity"],["Heartburn","severity"],["Heart palpitations","severity"],["Migraines","severity"],["Nausea","severity"],["Pins and needles / tingling hands or feet","severity"],["Sore breasts","severity"],["Tinnitus","severity"]
+    ["Fibromyalgia pain","severity"],["Bloating","severity"],["Breathing difficulties","severity"],["Digestive problems","severity"],["Feeling dizzy or faint","severity"],["Headaches","severity"],["Heartburn","severity"],["Heart palpitations","severity"],["Migraines","severity"],["Nausea","severity"],["Pins and needles / tingling hands or feet","severity"],["Sore breasts","severity"],["Tinnitus","severity"]
   ]},
   {name:"Urinary and sexual health",items:[
     ["UTI episode / recurrent UTIs","uti"],["Sex drive / low libido / fluctuations","libido"]
