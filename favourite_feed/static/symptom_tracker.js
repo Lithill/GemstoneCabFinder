@@ -123,6 +123,16 @@ function renderDiary(){
     el("strong",{text:item.name},info);
     el("p",{text:[item.answer,...item.extras].join(" · ")},info);
     if(item.notes)el("p",{text:item.notes},info);
+    const edit=el("button",{type:"button",text:"Edit","aria-label":"Edit "+item.name},row);
+    edit.addEventListener("click",()=>{
+      const category=groups.findIndex(g=>g.items.some(q=>q[0]===item.name));
+      if(category<0)return;
+      quickCategory=category;
+      quickSymptom=groups[category].items.findIndex(q=>q[0]===item.name);
+      showMode("quick");
+      quickOptions();
+      $("quick").scrollIntoView({block:"start"});
+    });
     const remove=el("button",{type:"button",text:"Remove", "aria-label":"Remove "+item.name},row);
     remove.addEventListener("click",()=>{diary.splice(i,1);renderDiary();});
     if (typeof window.stagingDeleteEntry === "function") {
