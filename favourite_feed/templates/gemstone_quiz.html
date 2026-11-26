@@ -60,13 +60,15 @@
 <img id="quiz-photo" class="quiz-photo" src="{{ item.photo }}" alt="Unlabelled gemstone listing photograph; reveal the title below" referrerpolicy="no-referrer">
 <section id="answer-panel" hidden aria-live="polite">
 <p id="feedback" role="status"></p>
-<h2>{{ answer }}</h2>
+<h2>{{ material.primary }}</h2>
+{% if material.alternate %}<p>Often called: {{ material.alternate }}</p>{% endif %}
+<p><strong>Material origin:</strong> {{ material.origin }}</p>
 {% if recognition_tip %}<div id="recognition-tip" hidden><strong>How to recognise it</strong><p>{{ recognition_tip }}</p><small>Visual clues are guides, not proof of identification from a photo.</small></div>{% endif %}
 <p id="listing-title"><strong>Etsy listing title:</strong> {{ item.title }}</p>
 {% if item.listing_url and item.listing_url.startswith('https://www.etsy.com/') %}<p><a href="{{ item.listing_url }}" target="_blank" rel="noopener noreferrer">View on Etsy</a></p>{% endif %}
 <small>Seller's identification; not independently verified.</small>
 </section>
-<div class="choices" aria-label="Choose a gemstone">{% for choice in choices %}<button type="button" class="quiz-choice" data-correct="{{ 'yes' if choice == answer else 'no' }}">{{ choice }}</button>{% endfor %}</div>
+<div class="choices" aria-label="Choose a gemstone">{% for choice in choices %}<button type="button" class="quiz-choice" data-gem="{{ choice }}" data-correct="{{ 'yes' if choice == answer else 'no' }}">{{ display_answer(choice) }}</button>{% endfor %}</div>
 <div class="quiz-controls">
 {% if position > 0 %}<a href="{{ url_for('gemstone_quiz',position=position-1,seed=seed) }}">← Previous photo</a>{% endif %}
 {% if practice %}<a id="next-photo" href="{{ url_for('gemstone_quiz',position=position,seed=seed) }}">Continue quiz →</a>{% elif position + 1 < total %}<a id="next-photo" href="{{ url_for('gemstone_quiz',position=position+1,seed=seed) }}">Next photo →</a>{% else %}<a id="next-photo" href="{{ url_for('gemstone_quiz',position=0) }}">Shuffle again</a>{% endif %}
@@ -91,7 +93,7 @@ buttons.forEach(button => button.addEventListener('click', () => {
     button.classList.add('wrong');
     const next = document.getElementById('next-photo');
     const url = new URL(next.href);
-    url.searchParams.set('practice', button.textContent.trim());
+    url.searchParams.set('practice', button.dataset.gem);
     next.href = url.href;
   }
   feedback.textContent = correct ? 'Correct — according to the seller!' : 'Not quite — the seller listed another gemstone.';
