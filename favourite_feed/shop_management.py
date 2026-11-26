@@ -21,12 +21,14 @@ def shop_name(value):
     return value
 
 
-def add_shop(value):
+def add_shop(value, *, expected_id=None):
     name = shop_name(value)
     shop = find_shop_by_name(name)
     if not shop:
         raise ValueError("No exact Etsy shop match found. Check the spelling and capitalisation.")
     sid = int(shop["shop_id"])
+    if expected_id is not None and sid != expected_id:
+        raise ValueError("Shop identity changed.")
     now = datetime.now(timezone.utc).isoformat()
     with connect_database() as conn:
         conn.execute("BEGIN IMMEDIATE")
