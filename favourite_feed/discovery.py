@@ -4,82 +4,14 @@ from config import SEARCH_TERMS, MIN_SHOP_RATING, MIN_SHOP_REVIEWS, MIN_SHOP_AGE
 from favourite_feed.database import connect_database
 from favourite_feed.etsy_api import etsy_get
 from favourite_feed.shop_management import add_shop
-import re
-from config import FINISHED_JEWELLERY_TERMS, WYSIWYG_POSITIVE_PHRASES, WYSIWYG_NEGATIVE_PHRASES
-
-def classify_wysiwyg(title, description="", rare_find=False):
-    """Classify evidence that the buyer receives the pictured stone."""
-    text = (str(title) + " " + str(description)).casefold()
-
-    for phrase in WYSIWYG_NEGATIVE_PHRASES:
-        if phrase in text:
-            return "Likely random selection"
-
-    for phrase in WYSIWYG_POSITIVE_PHRASES:
-        if phrase in text:
-            return "Likely WYSIWYG"
-
-    if rare_find:
-        return "Possible WYSIWYG - Rare find"
-
-    return "Needs checking"
-
-def is_loose_cabochon(title):
-    title = title.casefold()
-
-    if "cabochon" not in title and "cabochons" not in title:
-        return False
-
-    # Phrases suggesting the listing sells loose stones
-    loose_stone_phrases = [
-        "loose",
-        "flat back",
-        "flatback",
-        "calibrated",
-        "for jewelry making",
-        "for jewellery making",
-        "jewelry supply",
-        "jewellery supply",
-        "gemstone lot",
-        "cabochon lot",
-    ]
-
-    # Remove loose-stone phrases before checking jewellery terms.
-    # This protects phrases such as "for ring making".
-    if "for ring making" in title:
-        title = title.replace("for ring making", "")
-
-    if "for pendant making" in title:
-        title = title.replace("for pendant making", "")
-
-    # Check for clear evidence that the listing sells loose stones
-    is_loose_stone = any(
-        phrase in title for phrase in loose_stone_phrases
-    )
-
-    # Check whether the title mentions finished jewellery
-    is_finished_jewellery = any(
-        re.search(r"\b" + re.escape(term) + r"\b", title)
-        for term in FINISHED_JEWELLERY_TERMS
-    )
-
-    # Keep listings clearly described as loose stones
-    if is_loose_stone:
-        return True
-
-    # Exclude listings mentioning finished jewellery
-    if is_finished_jewellery:
-        return False
-
-    return True
-
-
+from favourite_feed.seller_filters import classify_wysiwyg, is_loose_cabochon, EVIDENCE_RANK
 
 def setup(conn):
     conn.execute("CREATE TABLE IF NOT EXISTS discovery_settings (id INTEGER PRIMARY KEY, terms TEXT NOT NULL)")
     conn.execute("""CREATE TABLE IF NOT EXISTS discovery_shops (
         shop_id INTEGER PRIMARY KEY, name TEXT, rating REAL, reviews INTEGER,
         country TEXT, evidence TEXT, listing_id INTEGER, status TEXT NOT NULL DEFAULT 'pending')""")
+    conn.execute("CREATE TABLE IF NOT EXISTS discovery_checked (shop_id INTEGER PRIMARY KEY, checked_at TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS discovery_queue (shop_id INTEGER PRIMARY KEY, evidence TEXT, listing_id INTEGER)")
     conn.execute("CREATE TABLE IF NOT EXISTS discovery_run (id INTEGER PRIMARY KEY, terms TEXT, position INTEGER, status TEXT)")
     conn.execute("INSERT OR IGNORE INTO discovery_settings VALUES (1,?)",(json.dumps(SEARCH_TERMS),))
@@ -94,6 +26,7 @@ def start():
     with connect_database() as conn:
         setup(conn)
         terms=conn.execute("SELECT terms FROM discovery_settings WHERE id=1").fetchone()[0]
+        conn.execute("DELETE FROM discovery_queue")
         conn.execute("INSERT OR REPLACE INTO discovery_run VALUES (1,?,0,'running')",(terms,))
 
 def step():
@@ -119,6 +52,7 @@ def step():
                     (shop_id,name,rating,reviews,country,evidence,listing_id)
                     SELECT ?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM monitored_shops WHERE shop_id=?)""",
                     (sid,shop["shop_name"],rating,reviews,country,queued["evidence"],queued["listing_id"],sid))
+            conn.execute("INSERT OR REPLACE INTO discovery_checked VALUES (?,datetime('now'))",(sid,))
             conn.execute("DELETE FROM discovery_queue WHERE shop_id=?",(sid,))
         return "Checked "+shop["shop_name"]
     if pos>=len(terms)*3:
@@ -134,10 +68,21 @@ def step():
             sid=item.get("shop_id")
             if not sid:
                 continue
+            evidence=classify_wysiwyg(item.get("title") or "",item.get("description") or "")
+            listing_id=item.get("listing_id")
+            existing=conn.execute("SELECT evidence,status FROM discovery_shops WHERE shop_id=?",(sid,)).fetchone()
+            if existing:
+                if existing["status"]=="pending" and EVIDENCE_RANK.get(evidence,0)>EVIDENCE_RANK.get(existing["evidence"],0):
+                    conn.execute("UPDATE discovery_shops SET evidence=?,listing_id=? WHERE shop_id=?",(evidence,listing_id,sid))
+                continue
+            if conn.execute("SELECT 1 FROM discovery_checked WHERE shop_id=? AND checked_at>=datetime('now','-30 days')",(sid,)).fetchone():
+                continue
             conn.execute("""INSERT OR IGNORE INTO discovery_queue
-                SELECT ?,?,? WHERE NOT EXISTS (SELECT 1 FROM monitored_shops WHERE shop_id=?)
-                AND NOT EXISTS (SELECT 1 FROM discovery_shops WHERE shop_id=?)""",
-                (sid,classify_wysiwyg(item.get("title") or "",item.get("description") or ""),item.get("listing_id"),sid,sid))
+                SELECT ?,?,? WHERE NOT EXISTS (SELECT 1 FROM monitored_shops WHERE shop_id=?)""",
+                (sid,evidence,listing_id,sid))
+            old=conn.execute("SELECT evidence FROM discovery_queue WHERE shop_id=?",(sid,)).fetchone()
+            if old and EVIDENCE_RANK.get(evidence,0)>EVIDENCE_RANK.get(old["evidence"],0):
+                conn.execute("UPDATE discovery_queue SET evidence=?,listing_id=? WHERE shop_id=?",(evidence,listing_id,sid))
         conn.execute("UPDATE discovery_run SET position=position+1 WHERE id=1")
     return "Searched "+term
 
