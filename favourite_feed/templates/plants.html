@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Houseplant care</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
+<style>
+.plants{max-width:860px;margin:auto;padding:1rem}.plant-card{border:1px solid #bbb;border-radius:14px;padding:1rem;margin:1rem 0}
+.plant-card h2{margin:.2rem 0}.plant-card p{line-height:1.5}.plant-card form{display:inline-flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0}
+.plants input,.plants select,.plants textarea,.plants button{font:inherit;padding:.65rem;border-radius:8px;max-width:100%}
+.plants input,.plants select,.plants textarea{border:1px solid #888}.plants button{cursor:pointer}
+.add-plant{display:grid;gap:.7rem;max-width:520px}.add-plant label{display:grid;gap:.3rem}
+.plant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin:1rem 0}
+@media(min-width:650px){.plant-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:900px){.plant-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.plant-tile{display:block;text-align:center;text-decoration:none;color:inherit;border:1px solid #bbb;border-radius:12px;overflow:hidden;background:#fff}
+.plant-tile:focus-visible{outline:3px solid #167b4c;outline-offset:2px}
+.plant-photo{height:145px;display:flex;align-items:center;justify-content:center;background:#e9f2e9;font-size:3rem;overflow:hidden}
+.plant-photo img{height:100%;width:100%;object-fit:cover}
+.plant-tile-name{display:block;padding:.65rem .3rem;font-weight:700}
+.plant-card{scroll-margin-top:1rem}
+.note{color:#555}.plant-card details{margin:.7rem 0}.plant-card summary{cursor:pointer;font-weight:bold}
+.plant-detail{display:none}.plant-detail:target{display:block}.plants:has(.plant-detail:target) #plant-overview{display:none}.return-plants{display:inline-block;padding:.65rem;border:1px solid #888;border-radius:8px;color:inherit;text-decoration:none}.plant-detail form button{background:#176b45;color:white;border:1px solid #176b45}
+</style></head><body>
+<header><h1>🌿 Houseplant care</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone feed</a></nav></header>
+<main class="plants">
+<section id="plant-overview">
+{% set photo_files = {
+"Money tree":"money-tree.jpg",
+"Button fern":"button-fern.jpg",
+"Christmas cactus":"christmas-cactus.jpg",
+"Fishbone cactus":"fishbone-cactus.jpg",
+"Golden pothos":"golden-pothos.jpg",
+"Grape ivy":"grape-ivy.jpg",
+"Jade plant":"jade-plant.jpg",
+"Kimberley queen fern":"kimberley-queen-fern.jpg",
+"Lipstick plant":"lipstick-plant.jpg",
+"Mother-in-law's tongue":"mother-in-laws-tongue.jpg",
+"Oxalis triangularis":"oxalis-triangularis.jpg",
+"Parlour palm":"parlour-palm.jpg",
+"Porcelain plant (Hoya)":"porcelain-plant-hoya.jpg",
+"Rattlesnake plant":"rattlesnake-plant.jpg",
+"Silver inch plant":"silver-inch-plant.jpg",
+"String of hearts":"string-of-hearts.jpg",
+"Cape sundew":"cape-sundew.jpg"
+} %}
+<div class="plant-grid">
+{% for plant in entries %}
+<a class="plant-tile" href="#plant-{{ plant.id }}">
+<span class="plant-photo" role="img" aria-label="Picture of {{ plant.species }}"><img src="{{ url_for('static', filename='plants/' ~ photo_files[plant.species]) }}" alt="{{ plant.species }} plant" loading="lazy" onerror="this.hidden=true;this.parentNode.append('🌿')"></span>
+<span class="plant-tile-name">{{ plant.name }}</span>
+</a>
+{% endfor %}
+</div>
+</section>
+{% for plant in entries %}
+<article class="plant-card plant-detail" id="plant-{{ plant.id }}">
+<h2>{{ plant.name }}</h2><p class="note">{{ plant.species }}</p>
+<p><strong>Last watered:</strong> {{ plant.last_watered or 'Not recorded yet' }}{% if guides[plant.id].days_since is not none %} ({{ guides[plant.id].days_since }} day{% if guides[plant.id].days_since != 1 %}s{% endif %} ago){% endif %}</p>
+<p><strong>When to check:</strong> {{ guides[plant.id].guidance }}.</p>
+{% if plant.notes %}<p>{{ plant.notes }}</p>{% endif %}
+<details open><summary>How to tell when it needs water</summary><p>{{ care[plant.species][0] }}</p></details>
+<details><summary>Problem signs to look for</summary><p>{{ care[plant.species][1] }}</p></details>
+<details><summary>How to keep it healthier</summary><p>{{ care[plant.species][2] }}</p></details>
+<form method="post" action="{{ url_for('plants.water',plant_id=plant.id) }}">
+<input type="hidden" name="watered_on" value="{{ today }}">
+<a class="return-plants" href="#plant-overview">Return to plants</a>
+<button type="submit">Watered</button>
+</form>
+
+</article>
+{% endfor %}
+</main>
+<script>
+function showPlantView(){const detail=document.querySelector(".plant-detail:target");document.getElementById("plant-overview").style.display=detail?"none":"";document.querySelectorAll(".plant-detail").forEach(card=>{card.style.display=card===detail?"block":"none";});if(detail)window.scrollTo(0,0);}
+window.addEventListener("hashchange",showPlantView);showPlantView();
+</script>
+</body></html>

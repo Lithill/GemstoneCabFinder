@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Swipe — Gemstone feed</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head>
+<body><header><h1>Gemstone feed</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Grid</a><a href="/refresh">Refresh</a><a href="/settings">Settings</a><a href="/?mode=liked">Favourites</a><form method="post" action="{{ url_for('undo') }}"><input type="hidden" name="view" value="swipe"><button>Undo</button></form></nav></header>
+<main class="swipe-main"><p><a href="/refresh">Refresh:</a> {{ refresh_status.status }} · {{ refresh_status.done }}/{{ refresh_status.total }} shops</p><h2>{{ count }} unseen</h2>
+{% if item %}<article id="swipe-card"><a draggable="false" id="photo-link" href="{{ url_for('detail',listing_id=item.listing_id) }}?view=swipe">{% if item.photo %}<img draggable="false" src="{{ item.photo }}" alt="{{ item.title }}">{% else %}<div class="placeholder">No photo</div>{% endif %}</a><div class="info"><strong>{{ item.title }}</strong><p>{{ item.shop_name }}</p>{% set main_price, original_price = price_display(item) %}{% if main_price %}<b>{{ main_price }}</b>{% if original_price %}<small style="display:block;color:#666">{{ original_price }}</small>{% endif %}{% endif %}</div></article>
+<form class="actions swipe-actions" id="swipe-form" method="post" action="{{ url_for('action',listing_id=item.listing_id) }}"><input type="hidden" name="view" value="swipe"><button name="operation" value="seen">← Pass</button><button name="operation" value="like">♡ Like →</button></form><p class="swipe-hint">Swipe left to pass · right to like · tap photo to inspect</p>
+<script>
+const card = document.getElementById('swipe-card');
+const form = document.getElementById('swipe-form');
+let start = null, suppress = false, busy = false;
+card.style.touchAction = 'pan-y';
+card.style.userSelect = 'none';
+card.style.cursor = 'grab';
+card.addEventListener('dragstart', e => e.preventDefault());
+card.addEventListener('pointerdown', e => {
+  if (busy || !e.isPrimary || e.button !== 0) return;
+  suppress = false;
+  card.style.transition = 'none';
+  start = {x:e.clientX,y:e.clientY,id:e.pointerId};
+});
+window.addEventListener('pointermove', e => {
+  if (!start || e.pointerId !== start.id || busy) return;
+  const x=e.clientX-start.x, y=e.clientY-start.y;
+  if(Math.abs(x)>10 && Math.abs(x)>Math.abs(y)) {
+    suppress=true;
+    card.style.transform='translate3d('+x+'px,0,0) rotate('+Math.max(-18,Math.min(18,x/22))+'deg)';
+  }
+});
+function reset(){
+  start=null;
+  card.style.transition='transform 180ms ease-out';
+  card.style.transform='';
+}
+window.addEventListener('pointercancel', reset);
+window.addEventListener('pointerup', e=>{
+  if(!start || e.pointerId!==start.id || busy)return;
+  const x=e.clientX-start.x,y=e.clientY-start.y;
+  start=null;
+  if(Math.abs(x)>15)suppress=true;
+  if(Math.abs(x)>Math.min(100,card.offsetWidth*.22) && Math.abs(x)>Math.abs(y)*1.2){
+    flyAway(x>0?'like':'seen');
+  } else reset();
+});
+function flyAway(operation){
+  if(busy)return;
+  busy=true;
+  suppress=true;
+  const direction=operation==='like'?1:-1;
+  const field=document.createElement('input');
+  field.type='hidden';field.name='operation';field.value=operation;
+  form.appendChild(field);
+  card.style.transition='transform 260ms ease-out, opacity 260ms ease-out';
+  card.style.transform='translate3d('+direction*(window.innerWidth+card.offsetWidth)+'px,0,0) rotate('+direction*22+'deg)';
+  card.style.opacity='0';
+  let submitted=false;
+  async function submit(){
+    if(submitted)return;
+    submitted=true;
+    try {
+      const response=await fetch(form.action,{method:'POST',headers:{'X-Feed-Action':'swipe'},body:new URLSearchParams({operation:operation,view:'swipe'}),cache:'no-store'});
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      const saved=await response.json();
+      if(!saved.seen || (operation==='like' && !saved.liked))throw new Error('Saved state did not match swipe');
+      window.location.replace('/?view=swipe');
+    } catch(error){
+      busy=false; suppress=false; field.remove();
+      card.style.opacity='1'; reset();
+      alert('Could not confirm '+operation+': '+error.message+'. Refresh the feed before retrying.');
+    }
+  }
+  card.addEventListener('transitionend',submit,{once:true});
+  setTimeout(submit,320);
+}
+form.addEventListener('submit',e=>{
+  e.preventDefault();
+  if(e.submitter)flyAway(e.submitter.value);
+});
+card.addEventListener('click', e=>{if(suppress || busy){e.preventDefault();e.stopPropagation();}},true);
+window.addEventListener('pageshow', e=>{if(e.persisted)location.reload();});
+</script>{% else %}<p>You're all caught up!</p>{% endif %}</main><script src="{{ url_for('static',filename='refresh_worker.js') }}"></script></body></html>

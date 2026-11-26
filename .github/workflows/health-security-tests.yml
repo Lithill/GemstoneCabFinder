@@ -1,0 +1,28 @@
+name: Health security tests (offline)
+on:
+  push:
+    branches:
+      - feature/favourite-feed
+  pull_request:
+    branches:
+      - feature/favourite-feed
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated test dependencies
+        run: python -m pip install 'Flask>=3,<4' 'cryptography>=42,<47'
+      - name: Compile staged security modules
+        run: python -m py_compile favourite_feed/health_auth.py favourite_feed/health_vault.py favourite_feed/health_answers.py favourite_feed/health_entries.py favourite_feed/health_checkins.py favourite_feed/health_diary_bridge.py favourite_feed/health_api.py favourite_feed/health_staging.py scripts/health_vault_admin.py scripts/rehearse_health_recovery.py
+      - name: Run offline security regression tests
+        run: python -m unittest discover -s tests -p 'test_health_*.py' -v
+      - name: Rehearse encrypted backup and recovery with fictional data
+        run: python scripts/rehearse_health_recovery.py

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guess the gemstone</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
+<style>
+.quiz{max-width:680px;margin:1rem auto;padding:0 1rem;text-align:center}
+.quiz-photo{display:block;width:100%;max-height:65vh;object-fit:contain;background:#f3f3f3;border-radius:14px}
+.quiz-controls{display:flex;flex-wrap:wrap;justify-content:center;gap:1rem;margin:1rem 0}
+.quiz-controls a,.quiz-controls button,.quiz summary{display:inline-block;padding:.8rem 1.1rem;border:1px solid #777;border-radius:10px;background:white;color:#111;font:inherit;cursor:pointer;text-decoration:none}
+.quiz details{margin:1rem 0;padding:1rem;border:1px solid #aaa;border-radius:12px}
+.quiz details strong{display:block;margin:1rem 0;overflow-wrap:anywhere;font-size:1.15rem}
+.quiz details[open] summary{background:#e9f3e9}
+.choices[hidden]{display:none}
+.choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem;margin:1rem 0}
+.choices button{padding:1rem .5rem;min-height:3.5rem;border:1px solid #777;border-radius:12px;background:white;color:#111;font:inherit;cursor:pointer}
+.choices button:disabled{cursor:default;opacity:1}
+.choices button.correct{border:3px solid #287347;background:#e9f6ee}
+.choices button.wrong{border:3px solid #b73a3a;background:#ffebeb}
+#answer-panel{display:grid;place-content:center;gap:1rem;min-height:280px;padding:2rem 1rem;border:1px solid #aaa;border-radius:14px;background:#f4f5f6}
+#answer-panel[hidden]{display:none}
+#answer-panel h2{font-size:1.6rem;margin:0}
+#feedback{font-weight:bold;font-size:1.2rem;margin:0}
+#listing-title{overflow-wrap:anywhere}
+#recognition-tip{text-align:left;line-height:1.55;background:#fff;padding:1rem;border-radius:10px;border:1px solid #ddd}
+#recognition-tip[hidden]{display:none}
+@media(max-width:420px){.choices{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>Guess the gemstone</h1><nav><a href="/">Gemstone feed</a><a href="/refresh">Refresh</a></nav></header>
+<main class="quiz">
+<section aria-label="Refresh progress"><progress id="refresh-progress" max="1" value="0" style="width:100%"></progress><p id="refresh-status" role="status">Loading refresh status…</p></section>
+<details><summary>Quiz settings</summary><form method="post" action="{{ url_for('gemstone_quiz_settings') }}" style="text-align:left"><p>Untick gemstones you have learned. Only selected gemstones will be used as question subjects.</p>{% for gem in gem_names %}<input type="hidden" name="displayed" value="{{ gem }}"><label style="display:block;padding:.35rem"><input type="checkbox" name="gem" value="{{ gem }}" {% if gem in enabled %}checked{% endif %}> {{ gem }}{% if gem not in available %} (no photos yet){% endif %}</label>{% endfor %}<button type="submit">Save settings</button></form></details>
+{% if not review_open %}<p><a href="{{ url_for('gemstone_quiz', review=1, seed=seed, position=position) }}#review">Unrecognised gemstones ({{ review_count }})</a></p>{% else %}<details id="review" open><summary>Unrecognised gemstones ({{ review_count }})</summary>
+<p>Review up to 10 listings at once. Enter names, tick Skip for unsuitable listings, or leave a row blank to review it later. Confirmed names are recognised in future titles.</p>
+{% if review %}
+<form method="post" action="{{ url_for('gemstone_quiz_labels') }}">
+<datalist id="known-gems">{% for gem in gem_names %}<option value="{{ gem }}">{% endfor %}</datalist>
+{% for row in review %}
+<section style="border-top:1px solid #aaa;padding:1rem 0;display:flex;gap:.75rem;align-items:flex-start;text-align:left">
+<img src="{{ row.photo }}" alt="Listing photograph" loading="lazy" referrerpolicy="no-referrer" style="width:90px;height:90px;object-fit:contain;flex-shrink:0">
+<div style="flex:1;min-width:0;overflow-wrap:anywhere">
+<p style="margin:0 0 .5rem">{{ row.title }}</p>
+<input type="hidden" name="listing_id" value="{{ row.listing_id }}">
+<label>Gemstone name <input name="name_{{ row.listing_id }}" list="known-gems" maxlength="100" placeholder="e.g. Larimar" style="width:100%;box-sizing:border-box"></label>
+<label style="display:block;margin-top:.5rem"><input type="checkbox" name="skip_{{ row.listing_id }}" value="1"> Skip listing</label>
+</div></section>
+{% endfor %}
+<p>Showing {{ review|length }} of {{ review_count }} awaiting review.</p>
+<button type="submit" style="padding:.8rem 1rem">Save &amp; next 10</button>
+</form>
+{% else %}<p>No listings awaiting review.</p>{% endif %}
+</details>{% endif %}
+{% if practice_notice %}<p>No enabled, matching photo is available for your previous guess. Continuing the quiz.</p>{% endif %}
+<p>Choose the gemstone shown. The seller’s identification and listing title appear immediately. Quiz settings are saved; answers are not recorded.</p>
+{% if item %}
+<p>{% if practice %}Extra practice question{% else %}Photo {{ position + 1 }} of {{ total }}{% endif %}</p>
+<img id="quiz-photo" class="quiz-photo" src="{{ item.photo }}" alt="Unlabelled gemstone listing photograph; reveal the title below" referrerpolicy="no-referrer">
+<section id="answer-panel" hidden aria-live="polite">
+<p id="feedback" role="status"></p>
+<h2>{{ answer }}</h2>
+{% if recognition_tip %}<div id="recognition-tip" hidden><strong>How to recognise it</strong><p>{{ recognition_tip }}</p><small>Visual clues are guides, not proof of identification from a photo.</small></div>{% endif %}
+<p id="listing-title"><strong>Etsy listing title:</strong> {{ item.title }}</p>
+{% if item.listing_url and item.listing_url.startswith('https://www.etsy.com/') %}<p><a href="{{ item.listing_url }}" target="_blank" rel="noopener noreferrer">View on Etsy</a></p>{% endif %}
+<small>Seller's identification; not independently verified.</small>
+</section>
+<div class="choices" aria-label="Choose a gemstone">{% for choice in choices %}<button type="button" class="quiz-choice" data-correct="{{ 'yes' if choice == answer else 'no' }}">{{ choice }}</button>{% endfor %}</div>
+<div class="quiz-controls">
+{% if position > 0 %}<a href="{{ url_for('gemstone_quiz',position=position-1,seed=seed) }}">← Previous photo</a>{% endif %}
+{% if practice %}<a id="next-photo" href="{{ url_for('gemstone_quiz',position=position,seed=seed) }}">Continue quiz →</a>{% elif position + 1 < total %}<a id="next-photo" href="{{ url_for('gemstone_quiz',position=position+1,seed=seed) }}">Next photo →</a>{% else %}<a id="next-photo" href="{{ url_for('gemstone_quiz',position=0) }}">Shuffle again</a>{% endif %}
+</div>
+{% else %}<p>No photos match your selected gemstones. Change quiz settings or refresh your Etsy listings.</p>{% endif %}
+</main>
+<script>
+const buttons = Array.from(document.querySelectorAll('.quiz-choice'));
+const feedback = document.getElementById('feedback');
+const answerPanel = document.getElementById('answer-panel');
+const photo = document.getElementById('quiz-photo');
+const choices = document.querySelector('.choices');
+const recognitionTip = document.getElementById('recognition-tip');
+buttons.forEach(button => button.addEventListener('click', () => {
+  if (buttons.some(b => b.disabled)) return;
+  const correct = button.dataset.correct === 'yes';
+  buttons.forEach(b => {
+    b.disabled = true;
+    if (b.dataset.correct === 'yes') b.classList.add('correct');
+  });
+  if (!correct) {
+    button.classList.add('wrong');
+    const next = document.getElementById('next-photo');
+    const url = new URL(next.href);
+    url.searchParams.set('practice', button.textContent.trim());
+    next.href = url.href;
+  }
+  feedback.textContent = correct ? 'Correct — according to the seller!' : 'Not quite — the seller listed another gemstone.';
+  photo.hidden = true;
+  choices.hidden = true;
+  answerPanel.hidden = false;
+  if (!correct && recognitionTip) recognitionTip.hidden = false;
+}));
+let statusBusy=false;
+async function showRefresh(){
+ if(document.hidden || statusBusy)return;
+ statusBusy=true;
+ try {
+  const response=await fetch('/refresh/status',{cache:'no-store'});
+  if(!response.ok) throw Error('Status unavailable');
+  const s=await response.json();
+  const p=document.getElementById('refresh-progress');
+  p.max=Math.max(1,s.total||0);p.value=s.done||0;
+  document.getElementById('refresh-status').textContent=s.status==='never'?'No refresh recorded': 'Refresh: '+s.status+' · '+(s.done||0)+' / '+(s.total||0)+' shops · '+(s.new_listings||0)+' new listings · '+(s.failures||0)+' failures';
+ }catch(e){document.getElementById('refresh-status').textContent='Refresh status temporarily unavailable';}finally{statusBusy=false;}
+}
+if(location.hash==="#review" && document.getElementById("review"))document.getElementById("review").open=true;
+showRefresh();setInterval(showRefresh,5000);
+</script>
+<script src="{{ url_for('static',filename='refresh_worker.js') }}"></script>
+</body></html>

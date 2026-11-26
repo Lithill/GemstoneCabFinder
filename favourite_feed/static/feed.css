@@ -1,0 +1,31 @@
+*{box-sizing:border-box}body{margin:0;background:#f6f5f2;color:#292923;font:16px system-ui,sans-serif}header{padding:18px clamp(16px,4vw,48px);background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}h1{font-size:1.5rem;margin:0}nav{display:flex;gap:20px}a{color:inherit;text-decoration:none}nav a,header>a{color:#38654b;font-weight:600}main{max-width:1500px;margin:auto;padding:20px}h2{font-size:1.25rem}small{color:#777}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}article{background:white;border-radius:12px;overflow:hidden;border:1px solid #e2e0db}article img,.placeholder{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#eee}.info{padding:12px}.info p{color:#777;font-size:.9rem;margin:8px 0}.photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px}.photos img{width:100%;display:block;border-radius:8px}.description{white-space:pre-wrap}@media(max-width:600px){main{padding:12px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.info{padding:9px;font-size:.85rem}}
+.actions{display:flex;gap:8px;padding:0 12px 12px}.actions button{flex:1}button{font:inherit;cursor:pointer;border:1px solid #c6d4ca;border-radius:8px;background:white;color:#38654b;padding:9px 12px}button[value=like]{background:#38654b;color:white}button:hover{filter:brightness(.95)}nav{align-items:center;flex-wrap:wrap}
+
+.swipe-main{max-width:540px;overflow:hidden}.swipe-main article img{max-height:58vh;object-fit:contain}.swipe-main #photo-link{display:block;touch-action:pan-y;user-select:none}.swipe-actions{padding:14px 0}.swipe-actions button{min-height:48px}.swipe-hint{text-align:center;color:#777;font-size:.85rem}
+
+body:has(.swipe-main){overflow-x:hidden}.swipe-main{overflow:visible}#swipe-card{will-change:transform;touch-action:pan-y}#swipe-card img{-webkit-user-drag:none}
+
+#viewer{position:fixed;inset:0;width:100%;height:100%;height:100dvh;max-width:none;max-height:none;margin:0;padding:12px;border:0;background:#151515;color:white}#viewer[open]{display:flex;flex-direction:column;gap:8px}#viewer::backdrop{background:#151515}.viewer-bar{display:flex;align-items:center;justify-content:space-between;gap:6px;flex:none}.viewer-bar button{background:#292929;color:white;border-color:#555;min-height:44px;padding:8px 12px}.viewer-bar button:disabled{opacity:.35}#photo-stage{flex:1;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none;user-select:none}#large-photo{display:block;max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;will-change:transform;user-select:none;-webkit-user-drag:none}.photo-open{cursor:zoom-in}
+
+/* Modular dashboard, separate from the existing gemstone browsing screens. */
+.dashboard{max-width:1050px;padding-top:32px}
+.dashboard-intro{color:#666;margin:0 0 24px}
+.dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:20px}
+.dashboard-card{padding:24px;border:1px solid #deded7;border-radius:18px;background:#fff;min-width:0}
+.dashboard-card h2{font-size:1.35rem;margin:10px 0}
+.dashboard-card p{line-height:1.5}
+.dashboard-symbol{font-size:2.2rem}
+.dashboard-stats{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
+.dashboard-stats span{background:#f0f4ef;border-radius:10px;padding:10px 12px;white-space:nowrap}
+.dashboard-stats strong{font-size:1.2rem;color:#315c41}
+.dashboard-refresh{color:#555;font-size:.92rem}
+.dashboard-links{display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin-top:20px}
+.dashboard-links a{color:#38654b;font-weight:600}
+.dashboard-links .dashboard-primary{background:#38654b;color:white;padding:12px 18px;border-radius:10px}
+.dashboard-coming{background:#f9f9f7}
+.dashboard-coming small{font-size:.7rem;font-weight:500}
+.dashboard-note{font-size:.9rem;color:#686868}
+@media(max-width:600px){.dashboard{padding:20px 12px}.dashboard-card{padding:20px}}
+
+/* Ten-stone grid pagination and one-click batch dismissal. */
+.page-status{color:#666;margin:12px 0}.page-dismiss{margin:24px 0;padding:20px;border:1px solid #c6d4ca;background:#fff;border-radius:12px;text-align:center}.page-dismiss button{background:#38654b;color:#fff;font-weight:700;min-height:48px}.page-dismiss p{font-size:.9rem;color:#666;margin-bottom:0}.pagination{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:24px;margin:24px 0}.pagination a{display:inline-block;padding:10px 14px;border:1px solid #c6d4ca;border-radius:8px;color:#38654b;font-weight:600}
