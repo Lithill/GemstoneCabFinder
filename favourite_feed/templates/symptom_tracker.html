@@ -73,6 +73,16 @@
 {% if storage_staging %}
 <section id="factors-panel" hidden aria-label="Lifestyle and changes">
 <h2>Lifestyle &amp; changes</h2>
+<h3>Ongoing factors</h3>
+<p>Set a status and dose once. Add a dated update only when it changes. This records your intended routine, not confirmed daily doses.</p>
+<div id="ongoing-list"></div><p id="ongoing-status" role="status"></p>
+<label for="ongoing-name">Name</label><input id="ongoing-name" maxlength="100" placeholder="Medication, supplement or habit">
+<label for="ongoing-category">Category</label><select id="ongoing-category"><option>Medication</option><option>Supplement</option><option>Exercise</option><option>Diet</option><option>Other</option></select>
+<label for="ongoing-day">Effective from</label><input type="date" id="ongoing-day">
+<label for="ongoing-state">Status</label><select id="ongoing-state"><option>Taking</option><option>Tapering</option><option>Withdrawal</option><option>Ongoing</option><option>Stopped</option></select>
+<label for="ongoing-dose">Dose or routine (optional)</label><input id="ongoing-dose" maxlength="100" placeholder="Amount and frequency">
+<button type="button" id="ongoing-save" disabled>Save dated change</button>
+<h3>Daily factors</h3>
 <p>Record daily habits or dated changes, including medication dose changes and supplement start or stop dates. Enter only what you want to track.</p>
 <label for="factor-day">Date</label><input type="date" id="factor-day">
 <p id="factor-status" role="status"></p>
@@ -91,4 +101,5 @@
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_staging_client.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_insights.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_factors.js') }}" defer></script>{% endif %}
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_ongoing.js') }}" defer></script>{% endif %}
 </body></html>
