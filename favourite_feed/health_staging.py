@@ -19,7 +19,7 @@ def register_private_preview(app):
     @app.get("/private-symptom-tracker")
     @require_health_login
     def private_symptom_tracker():
-        response = make_response(render_template("symptom_tracker.html", private_preview=True, site_auth=site_auth_mode(), storage_staging=os.environ.get("HEALTH_STAGING_STORAGE_ENABLED") == "1"))
+        response = make_response(render_template("symptom_tracker.html", private_preview=True, site_auth=site_auth_mode(), personal_diary=os.environ.get("HEALTH_PERSONAL_DIARY_ENABLED") == "1", storage_staging=os.environ.get("HEALTH_STAGING_STORAGE_ENABLED") == "1"))
         response.headers["Cache-Control"] = "no-store"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self'; "
