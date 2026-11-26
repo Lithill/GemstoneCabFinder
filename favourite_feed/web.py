@@ -242,6 +242,8 @@ def feed_breakdown(rows, filters, refresh_status):
 @app.get("/symptom-tracker")
 def symptom_tracker():
     """Read-only prototype: no health data is accepted or stored."""
+    if os.environ.get("HEALTH_TRACKER_PREVIEW_ENABLED") == "1":
+        return redirect("/private-symptom-tracker")
     response = app.make_response(render_template("symptom_tracker.html"))
     response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
     return response
