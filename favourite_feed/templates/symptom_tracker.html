@@ -6,7 +6,7 @@
 <body><header><h1>Perimenopause tracker</h1><nav>{% if site_auth %}<a href="/dashboard">Dashboard</a>{% elif private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 {% if storage_staging %}
-<div class="tracker-tabs" role="group" aria-label="Tracker views"><button type="button" id="diary-tab" aria-pressed="true" aria-controls="diary-panel">My diary</button><button type="button" id="insights-tab" aria-pressed="false" aria-controls="insights-panel">Calendar &amp; trends</button></div>
+<div class="tracker-tabs" role="group" aria-label="Tracker views"><button type="button" id="diary-tab" aria-pressed="true" aria-controls="diary-panel">My diary</button><button type="button" id="insights-tab" aria-pressed="false" aria-controls="insights-panel">Calendar &amp; trends</button><button type="button" id="factors-tab" aria-pressed="false" aria-controls="factors-panel">Lifestyle &amp; changes</button></div>
 {% endif %}
 <div id="diary-panel">
 {% if storage_staging %}
@@ -70,9 +70,25 @@
 <p>Scroll across the chart to see every day. None means explicitly recorded as none, not missing data.</p>
 </section>
 {% endif %}
+{% if storage_staging %}
+<section id="factors-panel" hidden aria-label="Lifestyle and changes">
+<h2>Lifestyle &amp; changes</h2>
+<p>Record daily habits or dated changes, including medication dose changes and supplement start or stop dates. Enter only what you want to track.</p>
+<label for="factor-day">Date</label><input type="date" id="factor-day">
+<p id="factor-status" role="status"></p>
+<div id="factor-items"></div>
+<label for="factor-category">Category</label>
+<select id="factor-category"><option>Exercise</option><option>Medication</option><option>Supplement</option><option>Stress</option><option>Caffeine</option><option>Alcohol</option><option>Diet</option><option>Other</option></select>
+<label for="factor-name">Name</label><input id="factor-name" maxlength="100" placeholder="e.g. Walking or multivitamin">
+<label for="factor-value">Amount or change</label><input id="factor-value" maxlength="100" placeholder="e.g. 30 minutes or Started">
+<div class="tracker-actions"><button type="button" id="factor-add">Add entry</button><button type="button" id="factor-save" class="tracker-primary">Save factors</button></div>
+<p>Record actual changes, not recommended doses. Blank days mean unknown, not none.</p>
+</section>
+{% endif %}
 <p class="tracker-footnote">{% if storage_staging %}{% if personal_diary %}Keep website password protection enabled. Backups are refreshed after diary changes; older copies may retain deleted answers until cleanup runs. {% else %}Private test mode. {% endif %}Saved answers are encrypted; free-text notes are never transmitted or saved. Removing an on-screen entry does not delete a previously saved answer. This is not a medical record or diagnostic tool.{% else %}This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.{% endif %}</p>
 </main>
 <script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_staging_client.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_insights.js') }}" defer></script>{% endif %}
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_factors.js') }}" defer></script>{% endif %}
 </body></html>
