@@ -3,7 +3,7 @@
 <title>Perimenopause tracker · Design preview</title>
 <link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
 <link rel="stylesheet" href="{{ url_for('static',filename='symptom_tracker.css') }}"></head>
-<body><header><h1>Perimenopause tracker</h1><nav>{% if private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
+<body><header><h1>Perimenopause tracker</h1><nav>{% if site_auth %}<a href="/dashboard">Dashboard</a>{% elif private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 {% if storage_staging %}
 <div class="tracker-warning"><strong>Private test diary — fictional information only.</strong> Your selected date loads automatically before entering answers. Nothing is stored until you choose Save check-in. Free-text notes are not stored.</div>
