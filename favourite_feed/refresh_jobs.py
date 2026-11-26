@@ -26,15 +26,19 @@ def ensure(conn):
 def snapshot():
     with connect_database() as conn:
         ensure(conn)
-        row = conn.execute("SELECT * FROM refresh_runs ORDER BY run_id DESC LIMIT 1").fetchone()
-        if not row:
-            return {"status":"never","total":0,"done":0}
-        data = dict(row)
-        data["issues"] = [dict(r) for r in conn.execute(
-            "SELECT s.shop_id, m.shop_name, s.message FROM refresh_run_shops s "
-            "JOIN monitored_shops m ON m.shop_id=s.shop_id "
-            "WHERE s.run_id=? AND s.status='failed' ORDER BY s.position", (row["run_id"],))]
-        return data
+        return _snapshot(conn)
+
+
+def _snapshot(conn):
+    row = conn.execute("SELECT * FROM refresh_runs ORDER BY run_id DESC LIMIT 1").fetchone()
+    if not row:
+        return {"status":"never","total":0,"done":0}
+    data = dict(row)
+    data["issues"] = [dict(r) for r in conn.execute(
+        "SELECT s.shop_id, m.shop_name, s.message FROM refresh_run_shops s "
+        "JOIN monitored_shops m ON m.shop_id=s.shop_id "
+        "WHERE s.run_id=? AND s.status='failed' ORDER BY s.position", (row["run_id"],))]
+    return data
 
 def start():
     with connect_database() as conn:
@@ -45,7 +49,7 @@ def start():
             # Reclaim a shop only if its request was interrupted long ago.
             conn.execute("""UPDATE refresh_run_shops SET status='pending', claimed_at=NULL
                 WHERE run_id=? AND status='working' AND claimed_at < datetime('now', '-10 minutes')""", (existing["run_id"],))
-            conn.execute("UPDATE refresh_runs SET status='running' WHERE run_id=?", (existing["run_id"],))
+            conn.execute("UPDATE refresh_runs SET status='running', error=NULL WHERE run_id=?", (existing["run_id"],))
             return snapshot_after(conn, existing["run_id"])
         shops = conn.execute("SELECT shop_id FROM monitored_shops WHERE is_active=1 ORDER BY shop_id").fetchall()
         cur = conn.execute("INSERT INTO refresh_runs(started_at,status,total) VALUES(?,'running',?)", (now(),len(shops)))
@@ -72,7 +76,7 @@ def step():
         conn.execute("BEGIN IMMEDIATE")
         run = conn.execute("SELECT * FROM refresh_runs WHERE status='running' ORDER BY run_id DESC LIMIT 1").fetchone()
         if not run:
-            return snapshot()
+            return _snapshot(conn)
         conn.execute("""UPDATE refresh_run_shops SET status='pending', claimed_at=NULL
             WHERE run_id=? AND status='working' AND claimed_at < datetime('now', '-10 minutes')""", (run["run_id"],))
         pending = conn.execute("SELECT * FROM refresh_run_shops WHERE run_id=? AND status='pending' ORDER BY position LIMIT 1", (run["run_id"],)).fetchone()
@@ -94,18 +98,15 @@ def step():
         after = conn.execute("SELECT COUNT(*) FROM listings WHERE shop_id=?", (pending["shop_id"],)).fetchone()[0]
         count = max(0,after-before)
         if error and ("rate limit" in error.lower() or "429" in error):
-            conn.execute("UPDATE refresh_run_shops SET status='pending',claimed_at=NULL,message=? WHERE run_id=? AND position=?",(error,run["run_id"],pending["position"]))
+            conn.execute("UPDATE refresh_run_shops SET status='pending',claimed_at=NULL,message=?,new_listings=new_listings+? WHERE run_id=? AND position=?",(error,count,run["run_id"],pending["position"]))
             conn.execute("UPDATE refresh_runs SET status='paused',error=?,new_listings=new_listings+? WHERE run_id=?",(error,count,run["run_id"]))
             return snapshot_after(conn,run["run_id"])
-        conn.execute("UPDATE refresh_run_shops SET status=?,message=?,new_listings=? WHERE run_id=? AND position=?",
+        conn.execute("UPDATE refresh_run_shops SET status=?,message=?,new_listings=new_listings+? WHERE run_id=? AND position=?",
                      ("failed" if error else "done",message,count,run["run_id"],pending["position"]))
-        rate_limited = bool(error and ("rate limit" in error.lower() or "429" in error))
         conn.execute("""UPDATE refresh_runs SET done=done+1, new_listings=new_listings+?,
-            baselines=baselines+?, failures=failures+?,last_shop=?,
-            status=CASE WHEN ? THEN 'paused' ELSE status END,
-            error=CASE WHEN ? THEN ? ELSE error END WHERE run_id=?""",
+            baselines=baselines+?, failures=failures+?,last_shop=? WHERE run_id=?""",
             (count,int(not error and shop["is_active"] and not shop["last_checked"]),int(bool(error)),
-             shop["shop_name"],int(rate_limited),int(rate_limited),error,run["run_id"]))
+             shop["shop_name"],run["run_id"]))
         remaining = conn.execute("SELECT 1 FROM refresh_run_shops WHERE run_id=? AND status IN ('pending','working') LIMIT 1", (run["run_id"],)).fetchone()
         if not remaining:
             conn.execute("UPDATE refresh_runs SET status='completed',finished_at=? WHERE run_id=?", (now(),run["run_id"]))
