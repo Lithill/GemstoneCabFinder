@@ -257,6 +257,19 @@ def session():
     return jsonify(csrf=current["csrf"])
 
 
+@health_api.get("/long-trends/<int:months>")
+def long_trends(months):
+    from favourite_feed.health_long_trends import monthly_trends
+    from favourite_feed.health_entries import get_validated
+    symptom = request.args.get("symptom", "Fibromyalgia pain")
+    if months not in (3, 6, 12) or QUESTIONS.get(symptom) not in ("severity", "sleep"):
+        abort(400)
+    path = _vault_path()
+    return jsonify(rows=monthly_trends(date.today(), months,
+        lambda day: get_validated(day, symptom, path=path)),
+        symptoms=[q for q, kind in QUESTIONS.items() if kind in ("severity", "sleep")])
+
+
 @health_api.get("/month/<month>")
 def read_month(month):
     from favourite_feed.health_vault import get
