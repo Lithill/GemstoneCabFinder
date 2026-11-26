@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Perimenopause tracker · Design preview</title>
+<title>Perimenopause tracker{% if not personal_diary %} · Design preview{% endif %}</title>
 <link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}">
 <link rel="stylesheet" href="{{ url_for('static',filename='symptom_tracker.css') }}"></head>
 <body><header><h1>Perimenopause tracker</h1><nav>{% if site_auth %}<a href="/dashboard">Dashboard</a>{% elif private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 {% if storage_staging %}
-<div class="tracker-warning"><strong>Private test diary — fictional information only.</strong> Your selected date loads automatically before entering answers. Nothing is stored until you choose Save check-in. Free-text notes are not stored.</div>
+<div class="tracker-warning">{% if personal_diary %}<strong>Your private symptom diary.</strong>{% else %}<strong>Private test diary — fictional information only.</strong>{% endif %} Your selected date loads automatically before entering answers. Nothing is stored until you choose Save check-in. Free-text notes are not stored.</div>
 {% else %}
 <div class="tracker-warning"><strong>Design preview only — nothing is saved.</strong> Answers stay on this page temporarily. Leaving or refreshing clears them. Do not enter identifying or sensitive notes during testing.</div>
 {% endif %}
@@ -33,7 +33,7 @@
 {% if storage_staging %}
 <section id="staging-storage" aria-label="Private staging check-ins">
 <h2>My daily check-in</h2>
-<p>Today loads automatically. Choose another date to revisit it, or use Load saved day to retry. You can revisit and edit earlier check-ins. This is still a fictional-data test environment.</p>
+<p>Today loads automatically. Choose another date to revisit it, or use Load saved day to retry. You can revisit and edit earlier check-ins. {% if not personal_diary %}This is still a fictional-data test environment.{% endif %}</p>
 <label for="staging-day">Check-in date</label>
 <input id="staging-day" type="date" required>
 <div class="tracker-actions">
@@ -50,7 +50,7 @@
 <div id="diary-items"></div>
 <button type="button" id="clear-diary">{% if storage_staging %}Clear on-screen entries (does not delete saved answers){% else %}Clear preview entries{% endif %}</button>
 </section>
-<p class="tracker-footnote">{% if storage_staging %}Private test mode. Saved answers are encrypted; free-text notes are never transmitted or saved. Removing an on-screen entry does not delete a previously saved answer. This is not a medical record or diagnostic tool.{% else %}This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.{% endif %}</p>
+<p class="tracker-footnote">{% if storage_staging %}{% if personal_diary %}Keep website password protection enabled. Backups are refreshed after diary changes; older copies may retain deleted answers until cleanup runs. {% else %}Private test mode. {% endif %}Saved answers are encrypted; free-text notes are never transmitted or saved. Removing an on-screen entry does not delete a previously saved answer. This is not a medical record or diagnostic tool.{% else %}This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.{% endif %}</p>
 </main>
 <script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_staging_client.js') }}" defer></script>{% endif %}
