@@ -595,5 +595,91 @@ def options(name, seed, listing_id, available=None):
     remaining = sorted(pool - set(answers))
     rng.shuffle(remaining)
     answers.extend(remaining[:max(0, 4-len(answers))])
-    rng.shuffle(answers)
-    return answers
+    # Do not offer two names for the same underlying answer.
+    seen = {material_info(name)["primary"].casefold()}
+    unique = [name]
+    for gem in answers[1:] + remaining:
+        key = material_info(gem)["primary"].casefold()
+        if key not in seen and len(unique) < 4:
+            unique.append(gem)
+            seen.add(key)
+    rng.shuffle(unique)
+    return unique
+
+# Presentation only: keep stored quiz keys and preferences stable.
+# These descriptions classify the named material, not the individual photograph.
+DISPLAY_NAMES = {
+    "Buffalo turquoise": ("White Buffalo stone", "White Buffalo turquoise"),
+    "Wild horse jasper": ("Magnesite-rich stone (composition unverified)", "Wild Horse jasper"),
+    "Herkimer diamond": ("Quartz", "Herkimer diamond"),
+    "Rainbow moonstone": ("White labradorite", "Rainbow moonstone"),
+    "Dalmatian jasper": ("Dalmatian stone", "Dalmatian jasper"),
+    "Bumblebee jasper": ("Bumblebee stone", "Bumblebee jasper"),
+    "Kambaba jasper": ("Kambaba stone", "Kambaba jasper"),
+    "Turritella jasper": ("Fossil snail agate", "Turritella jasper, Turritella agate"),
+    "Yellow onyx": ("Banded carbonate (usually calcite)", "Yellow onyx"),
+    "Fire quartz": ("Hematoid quartz", "Fire quartz"),
+    "Smoky topaz": ("Smoky quartz", "Smoky topaz (misleading name)"),
+    "Dendrite fossil": ("Dendritic stone (host unverified)", "Dendrite fossil"),
+    "Sphene": ("Titanite", "Sphene"),
+    "Titanite": ("Titanite", "Sphene"),
+    "Idocrase": ("Vesuvianite", "Idocrase"),
+    "Vesuvianite": ("Vesuvianite", "Idocrase"),
+    "Celestite": ("Celestine", "Celestite"),
+    "Celestine": ("Celestine", "Celestite"),
+    "Heliotrope": ("Bloodstone", "Heliotrope"),
+    "Bloodstone": ("Bloodstone", "Heliotrope"),
+    "Larimar": ("Blue pectolite", "Larimar"),
+    "Aquaprase": ("Blue-green chalcedony", "Aquaprase"),
+    "Gem silica": ("Copper-coloured chalcedony", "Gem silica"),
+    "Seraphinite": ("Clinochlore", "Seraphinite"),
+    "Spectrolite": ("Labradorite", "Spectrolite"),
+    "Iolite": ("Cordierite", "Iolite"),
+    "Tanzanite": ("Blue-violet zoisite", "Tanzanite"),
+    "Super seven": ("Included quartz", "Super Seven"),
+    "Tiffany stone": ("Fluorite-rich mixed rock (typically)", "Tiffany stone"),
+    "Grape agate": ("Botryoidal chalcedony", "Grape agate"),
+    "Fordite": ("Layered automotive paint", "Fordite"),
+    "Surfite": ("Layered surfboard resin", "Surfite"),
+    "Rosarita": ("Glassy industrial by-product", "Rosarita"),
+    "Opalite": ("Opalescent glass (usually)", "Opalite"),
+    "Aurora opal": ("Manufactured opal material (typically)", "Aurora opal"),
+    "Mohave turquoise": ("Reconstructed or composite turquoise (typically)", "Mohave turquoise"),
+    "Spiny oyster turquoise": ("Shell and turquoise composite", "Spiny oyster turquoise"),
+    "Mystic topaz": ("Coated topaz", "Mystic topaz"),
+    "Titanium aura quartz": ("Metal-coated quartz", "Titanium aura quartz"),
+    "Rainbow calsilica": ("Manufactured decorative material", "Rainbow calsilica"),
+    "Dyed howlite": ("Dyed howlite", ""),
+    "Shiva lingam": ("Polished stone (composition unverified)", "Shiva lingam"),
+    "Peacock zoisite": ("Zoisite-bearing material (unverified)", "Peacock zoisite"),
+    "Glacierite": ("Material unverified", "Glacierite"),
+    "Sunstone lepidolite": ("Mineral mixture (unverified)", "Sunstone lepidolite"),
+    "Iolite sunstone": ("Included cordierite (seller identification)", "Iolite sunstone"),
+    "Atlantisite": ("Stichtite in serpentine", "Atlantisite"),
+    "Yooperlite": ("Sodalite-bearing rock", "Yooperlite"),
+    "K2 granite": ("Azurite-bearing granite", "K2 stone"),
+}
+MANMADE = {"Fordite", "Surfite", "Rosarita", "Opalite", "Aurora opal", "Rainbow calsilica", "Watermelon quartz", "Mystic quartz"}
+COMPOSITE = {"Mohave turquoise", "Spiny oyster turquoise"}
+TREATED = {"Mystic topaz", "Titanium aura quartz", "Dyed howlite"}
+UNCERTAIN = {"Glacierite", "Peacock zoisite", "Sunstone lepidolite", "Dendrite fossil", "Yellow onyx", "Shiva lingam", "Wild horse jasper", "Iolite sunstone"}
+ORGANIC = {"Abalone", "Amber", "Jet", "Coral", "Pearl", "Mother of pearl", "Ammolite", "Ammonite", "Orthoceras", "Petrified wood", "Agatized dinosaur bone", "Fossil coral agate", "Petrified palm wood", "Opalised petrified wood", "Pink conch shell", "Spiny oyster", "Crinoid fossil", "Turritella jasper"}
+def material_info(name):
+    primary, alternate = DISPLAY_NAMES.get(name, (name or "", ""))
+    if name in MANMADE:
+        origin = "Man-made material (typical usage)"
+    elif name in COMPOSITE:
+        origin = "Man-made composite (typical usage)"
+    elif name in TREATED:
+        origin = "Treated natural material (seller identification)"
+    elif name in UNCERTAIN or name not in GEMS:
+        origin = "Origin or composition unverified"
+    elif name in ORGANIC:
+        origin = "Natural organic or fossil material (seller identification)"
+    else:
+        origin = "Natural mineral or rock type; treatment and authenticity unverified"
+    return {"primary": primary, "alternate": alternate, "origin": origin}
+
+def display_answer(name):
+    info = material_info(name)
+    return info["primary"] + (" (" + info["alternate"] + ")" if info["alternate"] else "")
