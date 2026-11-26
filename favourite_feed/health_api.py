@@ -206,6 +206,21 @@ def cycle_impact(days):
     return jsonify(**result, symptoms=[q for q, kind in QUESTIONS.items() if kind in ("severity", "sleep")])
 
 
+@health_api.get("/review/<int:days>")
+def period_review(days):
+    from favourite_feed.health_review import review
+    from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION
+    from favourite_feed.health_exercise import KEY
+    from favourite_feed.health_vault import get
+    if days not in (7, 30):
+        abort(400)
+    path = _vault_path()
+    items = (get(KEY_DAY, KEY_QUESTION, path=path) or {}).get("items", [])
+    return jsonify(review(date.today(), days, items,
+        lambda d: read_diary_offline(d, path=path),
+        lambda d: get(d, KEY, path=path)))
+
+
 @health_api.get("/personal-insights")
 def personal_insights():
     from favourite_feed.health_personal_insights import summarize
