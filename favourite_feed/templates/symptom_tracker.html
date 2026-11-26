@@ -6,7 +6,7 @@
 <body><header><h1>Perimenopause tracker</h1><nav>{% if site_auth %}<a href="/dashboard">Dashboard</a>{% elif private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 {% if storage_staging %}
-<div class="tracker-tabs" role="group" aria-label="Tracker views"><button type="button" id="diary-tab" aria-pressed="true" aria-controls="diary-panel">My diary</button><button type="button" id="insights-tab" aria-pressed="false" aria-controls="insights-panel">Calendar &amp; trends</button><button type="button" id="factors-tab" aria-pressed="false" aria-controls="factors-panel">Lifestyle &amp; changes</button></div>
+<div class="tracker-tabs" role="group" aria-label="Tracker views"><button type="button" id="diary-tab" aria-pressed="true" aria-controls="diary-panel">My diary</button><button type="button" id="insights-tab" aria-pressed="false" aria-controls="insights-panel">Calendar &amp; trends</button><button type="button" id="factors-tab" aria-pressed="false" aria-controls="factors-panel">Lifestyle &amp; changes</button><button type="button" id="impact-tab" aria-pressed="false" aria-controls="impact-panel">Impact analysis</button></div>
 {% endif %}
 <div id="diary-panel">
 {% if storage_staging %}
@@ -95,6 +95,16 @@
 <p>Record actual changes, not recommended doses. Blank days mean unknown, not none.</p>
 </section>
 {% endif %}
+{% if storage_staging %}
+<section id="impact-panel" hidden aria-label="Impact analysis">
+<h2>What seems to affect my symptoms?</h2>
+<p>Compare saved symptom ratings before and after a dated change. These are associations, not proof of benefit or harm.</p>
+<label for="impact-event">Recorded change</label><select id="impact-event"></select>
+<label for="impact-window">Days on each side</label><select id="impact-window"><option>7</option><option selected>14</option><option>30</option></select>
+<p id="impact-status" role="status"></p><div id="impact-results"></div>
+<p>Change day excluded. Missing answers are not zero. At least five ratings on each side are needed to label a difference; a change of 0.5 points is a descriptive threshold, not a clinical or statistical test.</p>
+</section>
+{% endif %}
 <p class="tracker-footnote">{% if storage_staging %}{% if personal_diary %}Keep website password protection enabled. Backups are refreshed after diary changes; older copies may retain deleted answers until cleanup runs. {% else %}Private test mode. {% endif %}Saved answers are encrypted; free-text notes are never transmitted or saved. Removing an on-screen entry does not delete a previously saved answer. This is not a medical record or diagnostic tool.{% else %}This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.{% endif %}</p>
 </main>
 <script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
@@ -102,4 +112,5 @@
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_insights.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_factors.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_ongoing.js') }}" defer></script>{% endif %}
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_impact.js') }}" defer></script>{% endif %}
 </body></html>
