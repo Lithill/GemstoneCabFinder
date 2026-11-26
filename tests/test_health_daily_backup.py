@@ -26,3 +26,24 @@ class DailyBackupTests(unittest.TestCase):
             self.assertEqual(get("2026-11-01", "Brain fog", restored), {"severity": 8})
             self.assertEqual(latest.stat().st_mode & 0o777, 0o600)
             self.assertEqual(folder.stat().st_mode & 0o777, 0o700)
+
+    def test_refresh_and_failed_replacement(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict("os.environ", {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
+            root = Path(tmp)
+            vault = root / "fictional.db"
+            folder = root / "backups"
+            provision(vault)
+            now = datetime(2026, 11, 26, tzinfo=timezone.utc)
+            put("2026-11-26", "Brain fog", {"severity": 1}, vault)
+            target = rotate(vault, folder, now, refresh=True)
+            put("2026-11-26", "Brain fog", {"severity": 2}, vault)
+            self.assertEqual(rotate(vault, folder, now, refresh=True), target)
+            self.assertEqual(len(list(folder.glob("health-*.enc"))), 1)
+            previous = target.read_bytes()
+            with patch("scripts.health_daily_backup.encrypted_backup", side_effect=OSError("test failure")):
+                with self.assertRaises(OSError):
+                    rotate(vault, folder, now, refresh=True)
+            self.assertEqual(target.read_bytes(), previous)
+            restored = root / "restored.db"
+            restore_backup(target, restored)
+            self.assertEqual(get("2026-11-26", "Brain fog", restored), {"severity": 2})
