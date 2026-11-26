@@ -20,3 +20,8 @@
 .insight-plot th,.insight-plot td {border:1px solid #d5ddd6;text-align:center;padding:4px;min-width:18px}
 .insight-plot th[scope=row] {text-align:left;position:sticky;left:0;background:#fff}
 .insight-point {color:#365f4b;background:#e3eee6}
+
+.tracker-tabs {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 16px}
+.tracker-tabs button {padding:12px 8px;font-weight:600}
+.tracker-tabs button[aria-pressed="true"] {background:#365f4b;color:#fff;border-color:#365f4b}
+#diary-panel[hidden],#insights-panel[hidden] {display:none!important}
