@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 from config import SEARCH_TERMS, MIN_SHOP_RATING, MIN_SHOP_REVIEWS, MIN_SHOP_AGE_DAYS, TARGET_SHIPPING_COUNTRIES
-from favourite_feed.database import connect_database
+from favourite_feed.database import connect_database, PROJECT_ROOT
 from favourite_feed.etsy_api import etsy_get
 from favourite_feed.shop_management import add_shop
 from favourite_feed.seller_filters import classify_wysiwyg, is_loose_cabochon, EVIDENCE_RANK
@@ -21,6 +21,16 @@ def terms_from_text(value):
     if not 1<=len(terms)<=50 or any(len(s)>100 for s in terms):
         raise ValueError("Enter 1–50 search terms, each at most 100 characters.")
     return terms
+
+def legacy_exclusions():
+    # The old history includes pending spreadsheet rows, not just rejections.
+    # Existing pending rows take precedence; import the spreadsheet first.
+    def lines(filename):
+        path=PROJECT_ROOT / "data" / filename
+        return [line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.lstrip().startswith("#")] if path.exists() else []
+    return ({int(v) for v in lines("reviewed_shop_ids.txt") if v.isdecimal()},
+            {v.casefold() for v in lines("favourited_shops.txt")})
 
 def start():
     with connect_database() as conn:
@@ -45,7 +55,8 @@ def step():
         reviews=shop.get("review_count") or 0
         country=shop.get("shipping_from_country_iso")
         age=(datetime.now(timezone.utc).timestamp()-(shop.get("create_date") or datetime.now(timezone.utc).timestamp()))/86400
-        qualifies=rating>=MIN_SHOP_RATING and reviews>=MIN_SHOP_REVIEWS and age>=MIN_SHOP_AGE_DAYS and (not country or country in TARGET_SHIPPING_COUNTRIES)
+        _, excluded_names=legacy_exclusions()
+        qualifies=shop["shop_name"].casefold() not in excluded_names and rating>=MIN_SHOP_RATING and reviews>=MIN_SHOP_REVIEWS and age>=MIN_SHOP_AGE_DAYS and (not country or country in TARGET_SHIPPING_COUNTRIES)
         with connect_database() as conn:
             if qualifies:
                 conn.execute("""INSERT OR IGNORE INTO discovery_shops
@@ -59,6 +70,7 @@ def step():
         with connect_database() as conn:
             conn.execute("UPDATE discovery_run SET status='complete' WHERE id=1")
         return "Search complete"
+    historical_ids,_=legacy_exclusions()
     term=terms[pos//3]
     data=etsy_get("listings/active",{"keywords":term,"limit":100,"offset":(pos%3)*100,"sort_on":"score","buyer_country":"GB"})
     with connect_database() as conn:
@@ -74,6 +86,8 @@ def step():
             if existing:
                 if existing["status"]=="pending" and EVIDENCE_RANK.get(evidence,0)>EVIDENCE_RANK.get(existing["evidence"],0):
                     conn.execute("UPDATE discovery_shops SET evidence=?,listing_id=? WHERE shop_id=?",(evidence,listing_id,sid))
+                continue
+            if sid in historical_ids:
                 continue
             if conn.execute("SELECT 1 FROM discovery_checked WHERE shop_id=? AND checked_at>=datetime('now','-30 days')",(sid,)).fetchone():
                 continue
