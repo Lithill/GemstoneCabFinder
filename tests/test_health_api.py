@@ -101,6 +101,17 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         self.assertEqual(data["timeline"]["2026-02-04"]["changes"][0]["status"], "Stopped")
         self.assertNotIn("2026-02-02", data["days"])
 
+    def test_report_requires_auth_and_is_not_cached(self):
+        endpoint = "/private-health-api/report/30"
+        self.assertEqual(self.client.get(endpoint).status_code, 401)
+        self.login()
+        response = self.client.get(endpoint)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertIn(b"Health Tracker", response.data)
+        self.assertIn(b"No severity ratings recorded", response.data)
+        self.assertEqual(self.client.get("/private-health-api/report/365").status_code, 400)
+
     def test_invalid_submission_does_not_partially_save(self):
         csrf = self.login()
         response = self.client.post("/private-health-api/checkin/2026-11-21", headers={"X-Health-CSRF":csrf},
