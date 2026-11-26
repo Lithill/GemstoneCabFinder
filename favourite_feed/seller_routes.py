@@ -1,5 +1,6 @@
 """Seller management routes, registered with the shared refresh lock."""
 import json
+from werkzeug.exceptions import HTTPException
 from flask import request, abort, jsonify, render_template
 from favourite_feed.database import connect_database
 
@@ -36,7 +37,11 @@ def register_seller_routes(app, refresh_lock):
                 else:
                     abort(400)
             except ValueError as exc:
+                if request.form.get("operation")=="step":
+                    return jsonify(error=str(exc)),400
                 message=str(exc)
+            except HTTPException:
+                raise
             except Exception:
                 app.logger.exception("Discovery operation failed")
                 message="Operation failed. Search progress retained; try again later."
@@ -87,6 +92,8 @@ def register_seller_routes(app, refresh_lock):
                     abort(400)
             except ValueError as exc:
                 message = str(exc)
+            except HTTPException:
+                raise
             except Exception:
                 app.logger.exception("Favourite shop operation failed")
                 message = "Shop operation could not finish. Check the list below; partial imports can be retried."
