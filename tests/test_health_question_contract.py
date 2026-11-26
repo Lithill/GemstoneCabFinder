@@ -25,7 +25,7 @@ class HealthQuestionContractTests(unittest.TestCase):
             r'\[\s*"([^"\\]+)"\s*,\s*"(yesno|period|date|severity|sleep|uti|libido|weight)"\s*\]',
             declaration,
         )
-        self.assertEqual(len(browser_questions), 36)
+        self.assertEqual(len(browser_questions), 37)
         self.assertEqual(len(browser_questions), len(set(name for name, _ in browser_questions)))
         self.assertEqual(dict(browser_questions), QUESTIONS)
 
