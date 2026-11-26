@@ -50,8 +50,24 @@
 <div id="diary-items"></div>
 <button type="button" id="clear-diary">{% if storage_staging %}Clear on-screen entries (does not delete saved answers){% else %}Clear preview entries{% endif %}</button>
 </section>
+{% if storage_staging %}
+<section aria-label="Symptom insights">
+<h2>Symptom calendar and trends</h2>
+<label for="insight-month">Month</label>
+<input type="month" id="insight-month">
+<button type="button" id="insight-refresh">Refresh insights</button>
+<p id="insight-status" role="status"></p>
+<div id="insight-calendar" class="insight-calendar"></div>
+<p>Highlighted dates have saved answers. Select any date to open its diary.</p>
+<label for="insight-symptom">Symptom severity</label>
+<select id="insight-symptom"></select>
+<div id="insight-chart" class="insight-chart" tabindex="0" aria-label="Monthly severity chart"></div>
+<p>Scroll across the chart to see every day. None means explicitly recorded as none, not missing data.</p>
+</section>
+{% endif %}
 <p class="tracker-footnote">{% if storage_staging %}{% if personal_diary %}Keep website password protection enabled. Backups are refreshed after diary changes; older copies may retain deleted answers until cleanup runs. {% else %}Private test mode. {% endif %}Saved answers are encrypted; free-text notes are never transmitted or saved. Removing an on-screen entry does not delete a previously saved answer. This is not a medical record or diagnostic tool.{% else %}This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.{% endif %}</p>
 </main>
 <script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_staging_client.js') }}" defer></script>{% endif %}
+{% if storage_staging %}<script src="{{ url_for('static',filename='health_insights.js') }}" defer></script>{% endif %}
 </body></html>
