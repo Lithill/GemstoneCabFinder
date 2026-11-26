@@ -164,6 +164,49 @@ def refresh_step():
 def refresh_page():
     return render_template("refresh.html", demo=database.DB_PATH.name == "favourite_feed_demo.db")
 
+@app.route("/favourite-shops", methods=["GET", "POST"])
+def favourite_shops():
+    from favourite_feed.shop_management import add_shop, import_recent
+    from urllib.parse import urlsplit
+    message = ""
+    if request.method == "POST":
+        origin = request.headers.get("Origin")
+        referer = request.headers.get("Referer")
+        expected = urlsplit(request.host_url)
+        source = urlsplit(origin or referer or "")
+        if (source.scheme, source.netloc) != (expected.scheme, expected.netloc):
+            abort(403)
+        if not refresh_lock.acquire(blocking=False):
+            return "A refresh is in progress. Try again shortly.", 409
+        try:
+            operation = request.form.get("operation")
+            if operation == "add":
+                sid, created = add_shop(request.form.get("shop",""))
+                message = "Shop added. Future listings will be monitored." if created else "Shop already exists; its monitoring status is unchanged."
+            elif operation in ("pause","resume","import"):
+                sid = int(request.form.get("shop_id",""))
+                if operation == "import":
+                    count = import_recent(sid,int(request.form.get("limit","0")))
+                    message = f"Imported {count} additional listings."
+                else:
+                    with connect_database() as conn:
+                        conn.execute("UPDATE monitored_shops SET is_active=? WHERE shop_id=?", (int(operation=="resume"),sid))
+                    message = "Monitoring resumed." if operation=="resume" else "Monitoring paused. Existing listings retained."
+            else:
+                abort(400)
+        except ValueError as exc:
+            message = str(exc)
+        except Exception:
+            app.logger.exception("Favourite shop operation failed")
+            message = "Shop operation could not finish. Check the list below; partial imports can be retried."
+        finally:
+            refresh_lock.release()
+    with connect_database() as conn:
+        shops = conn.execute("""SELECT s.*, (SELECT COUNT(*) FROM listings l WHERE l.shop_id=s.shop_id) AS listing_count
+            FROM monitored_shops s ORDER BY is_active DESC, shop_name COLLATE NOCASE""").fetchall()
+    return render_template("favourite_shops.html", shops=shops, message=message)
+
+
 @app.get("/refresh/shops")
 def refresh_shops():
     with connect_database() as conn:
