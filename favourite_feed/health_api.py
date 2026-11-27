@@ -15,9 +15,11 @@ from favourite_feed.health_auth import _valid_session, health_csrf_required
 from favourite_feed.health_diary_bridge import read_diary_offline, save_diary_offline
 from favourite_feed.health_entries import delete_validated
 
+# Group all private health endpoints under one URL prefix so shared request protections apply to them.
 health_api = Blueprint("health_api", __name__, url_prefix="/private-health-api")
 
 
+# Read the configured vault path and reject reserved database names and direct symbolic links.
 def _vault_path():
     configured = os.environ.get("HEALTH_STAGING_VAULT_PATH", "")
     if not configured:
@@ -34,12 +36,14 @@ def _vault_path():
     return path
 
 
+# Run these checks before every private API endpoint, including read-only requests.
 @health_api.before_request
 def require_private_session():
     if os.environ.get("HEALTH_STAGING_STORAGE_ENABLED") != "1":
         abort(404)
     if not _valid_session():
         abort(401)
+    # Require CSRF protection, a bounded request size and JSON content for writes.
     if request.method != "GET":
         health_csrf_required()
         if request.content_length is None or request.content_length > 65536:
@@ -48,6 +52,7 @@ def require_private_session():
             abort(415)
 
 
+# Apply privacy-related response headers to discourage caching and referrer leakage.
 @health_api.after_request
 def private_headers(response):
     response.headers["Cache-Control"] = "no-store"
@@ -56,6 +61,7 @@ def private_headers(response):
     return response
 
 
+# Attempt an encrypted backup after saving when enabled; report backup failure separately from the saved data.
 def _backup_after_write(path):
     if os.environ.get("HEALTH_AUTO_BACKUP_ENABLED") != "1":
         return None
@@ -69,6 +75,7 @@ def _backup_after_write(path):
 
 
 @health_api.route("/factors/<day>", methods=["GET", "POST"])
+# Read or replace a day's lifestyle factors, validating each item; an empty list removes the record.
 def factors(day):
     from favourite_feed.health_vault import get, put, delete
     try:
@@ -104,6 +111,7 @@ def factors(day):
 
 
 @health_api.route("/ongoing", methods=["GET", "POST"])
+# Read or replace the encrypted collection of ongoing lifestyle and medication histories.
 def ongoing():
     from favourite_feed.health_ongoing import validate, KEY_DAY, KEY_QUESTION
     from favourite_feed.health_vault import get, put, delete
@@ -125,6 +133,7 @@ def ongoing():
 
 
 @health_api.get("/impact/<day>/<int:window>")
+# Compare symptom scores around a selected change date and include nearby recorded changes.
 def impact(day, window):
     from datetime import timedelta
     from favourite_feed.health_impact import compare
@@ -146,6 +155,7 @@ def impact(day, window):
 
 
 @health_api.route("/exercise/<day>", methods=["GET", "POST"])
+# Read or save exercise sessions or an explicit rest day; an empty log removes the record.
 def exercise(day):
     from favourite_feed.health_exercise import KEY, validate
     from favourite_feed.health_vault import get, put, delete
@@ -169,6 +179,7 @@ def exercise(day):
 
 
 @health_api.get("/exercise-impact/<int:days>/<int:lag>")
+# Compare recorded exercise and rest days with symptom outcomes at the selected delay.
 def exercise_impact(days, lag):
     from favourite_feed.health_exercise import KEY, compare_exercise
     from favourite_feed.health_vault import get
@@ -181,6 +192,7 @@ def exercise_impact(days, lag):
 
 
 @health_api.get("/exercise-recovery/<int:days>/<int:lag>/<mode>")
+# Compare symptom outcomes across the selected exercise or recovery grouping.
 def exercise_recovery(days, lag, mode):
     from favourite_feed.health_recovery import GROUPS, compare_recovery
     from favourite_feed.health_exercise import KEY
@@ -196,6 +208,7 @@ def exercise_recovery(days, lag, mode):
 
 
 @health_api.get("/cycle-impact/<int:days>")
+# Compare symptom scores across recorded bleeding and cycle-related groups.
 def cycle_impact(days):
     from favourite_feed.health_cycle import compare_cycle
     symptom = request.args.get("symptom", "Fibromyalgia pain")
@@ -207,6 +220,7 @@ def cycle_impact(days):
 
 
 @health_api.get("/report/<int:days>")
+# Build a printable report from diary, exercise and ongoing-factor records.
 def health_report(days):
     from flask import render_template, make_response
     from favourite_feed.health_report import build_report
@@ -226,6 +240,7 @@ def health_report(days):
 
 
 @health_api.get("/review/<int:days>")
+# Compare two recent periods of equal length using the review helper.
 def period_review(days):
     from favourite_feed.health_review import review
     from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION
@@ -241,6 +256,7 @@ def period_review(days):
 
 
 @health_api.get("/combined/<int:days>/<int:lag>")
+# Compare symptom outcomes across combinations of recorded influencing factors.
 def combined_impact(days, lag):
     from favourite_feed.health_combined import compare_combined
     from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION
@@ -258,6 +274,7 @@ def combined_impact(days, lag):
 
 
 @health_api.get("/personal-insights")
+# Generate descriptive personal patterns from saved diary and lifestyle records.
 def personal_insights():
     from favourite_feed.health_personal_insights import summarize
     from favourite_feed.health_ongoing import KEY_DAY, KEY_QUESTION
@@ -271,12 +288,14 @@ def personal_insights():
 
 
 @health_api.get("/session")
+# Return the CSRF token for subsequent authorised browser write requests.
 def session():
     current = _valid_session()
     return jsonify(csrf=current["csrf"])
 
 
 @health_api.get("/long-trends/<int:months>")
+# Return monthly symptom summaries for the selected time span.
 def long_trends(months):
     from favourite_feed.health_long_trends import monthly_trends
     from favourite_feed.health_entries import get_validated
@@ -290,6 +309,7 @@ def long_trends(months):
 
 
 @health_api.get("/month/<month>")
+# Build calendar summaries and a combined timeline for every date in the requested month.
 def read_month(month):
     from favourite_feed.health_vault import get
     from favourite_feed.health_exercise import KEY
@@ -315,6 +335,7 @@ def read_month(month):
         period = next((e["answer"] for e in entries if e["name"] == "Period / bleeding today"), None)
         changes = [{"name": item["name"], **event} for item in items for event in item["history"] if event["day"] == day]
         timeline[day] = {"exercise": log, "period": period, "changes": changes}
+    # Include the latest effective ongoing-factor event at the beginning of the month.
     baseline = [{"name": item["name"], **event} for item in items
                 for event in [effective(item, first.isoformat())] if event is not None]
     return jsonify(days=days, timeline=timeline, baseline=baseline,
@@ -322,6 +343,7 @@ def read_month(month):
 
 
 @health_api.get("/checkin/<day>")
+# Load validated answers for one date and return them in the browser's diary format.
 def read_checkin(day):
     try:
         entries = read_diary_offline(day, path=_vault_path())
@@ -331,6 +353,7 @@ def read_checkin(day):
 
 
 @health_api.post("/checkin/<day>")
+# Validate the JSON submission and save its entries together before attempting a backup.
 def save_checkin(day):
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict) or set(payload) != {"entries"}:
@@ -343,6 +366,7 @@ def save_checkin(day):
 
 
 @health_api.post("/delete/<day>")
+# Delete one explicitly named symptom answer for the requested date, then attempt a backup.
 def delete_checkin_entry(day):
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict) or set(payload) != {"question"}:
