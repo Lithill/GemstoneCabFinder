@@ -1,12 +1,13 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gemstone reference library</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"><style>
+/* Use a responsive grid of reference cards with consistently sized photographs. */
 main{max-width:900px;margin:auto;padding:1rem}.library{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}.entry{border:1px solid #aaa;border-radius:12px;padding:1rem;overflow-wrap:anywhere}.entry img{width:100%;height:180px;object-fit:contain}.entry h2{font-size:1.2rem}.entry p{line-height:1.5}
 </style></head><body><header><h1>Gemstone reference library</h1><nav><a href="{{ url_for('gemstone_quiz') }}">Return to quiz</a> · <a href="/">Gemstone feed</a></nav></header><main>
-<form method="get"><label>Search names <input name="q" value="{{ query }}" placeholder="e.g. Larimar"></label><button>Search</button> <a href="{{ url_for('gemstone_library') }}">Clear</a></form>
+{# Send the search text to the server and preserve it in the search field. #}<form method="get"><label>Search names <input name="q" value="{{ query }}" placeholder="e.g. Larimar"></label><button>Search</button> <a href="{{ url_for('gemstone_library') }}">Clear</a></form>
 <p>{{ entries|length }} materials. Photographs and names are seller identifications, not independently verified.</p>
-<div class="library">{% for name, info, photo, tip, similar in entries %}<article class="entry">
+{# Render each matching material with its available photograph, names, origin and recognition guidance. #}<div class="library">{% for name, info, photo, tip, similar in entries %}<article class="entry">
 {% if photo %}<img src="{{ photo }}" loading="lazy" referrerpolicy="no-referrer" alt="Seller-labelled {{ name }}">{% else %}<p>No collected photograph yet.</p>{% endif %}
 <h2>{{ info.primary }}</h2>{% if info.alternate %}<p>Often called: {{ info.alternate }}</p>{% endif %}<p>{{ info.origin }}</p>
 <strong>How to recognise it</strong><p>{{ tip or 'No specific identification guide yet.' }}</p>
-{% if similar %}<p><strong>Similar materials:</strong> {% for gem in similar %}<a href="{{ url_for('gemstone_library', q=gem) }}">{{ display_answer(gem) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+{# Link similar materials back to filtered library searches for comparison. #}{% if similar %}<p><strong>Similar materials:</strong> {% for gem in similar %}<a href="{{ url_for('gemstone_library', q=gem) }}">{{ display_answer(gem) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 </article>{% endfor %}</div></main></body></html>
