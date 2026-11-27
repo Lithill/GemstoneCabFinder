@@ -6,6 +6,7 @@ choice sets aligned with the non-saving JavaScript prototype.
 from datetime import date
 import math
 
+# Map each supported diary question to its answer type; keep these names aligned with the browser.
 QUESTIONS = {
     "Hot flushes": "yesno", "Night sweats": "yesno",
     "Period / bleeding today": "period",
@@ -35,6 +36,7 @@ QUESTIONS = {
     "Weight measurement": "weight",
 }
 
+# Define the exact permitted text answers for each choice-based question type.
 CHOICES = {
     "yesno": {"Yes", "No"},
     "severity": {"None", "Mild", "Moderate", "Severe"},
@@ -53,6 +55,7 @@ def validate_entry(day, question, answer):
     Notes are deliberately excluded until a separate privacy and retention
     decision is made. No entry is persisted by this function.
     """
+    # Reject unknown questions and invalid date types before processing an answer.
     if not isinstance(day, str) or not isinstance(question, str) or question not in QUESTIONS:
         raise ValueError("Unknown date or symptom question.")
     try:
@@ -62,6 +65,7 @@ def validate_entry(day, question, answer):
         raise ValueError("Invalid entry date.") from exc
     if not isinstance(answer, dict) or set(answer) - {"answer", "flow", "detail", "hours", "unit"}:
         raise ValueError("Unexpected answer fields.")
+    # Choose the validation rules using the question's declared type.
     kind = QUESTIONS[question]
     value = answer.get("answer")
     if kind in CHOICES:
@@ -75,9 +79,11 @@ def validate_entry(day, question, answer):
                 raise ValueError
         except ValueError as exc:
             raise ValueError("Invalid period event date.") from exc
+    # Require a finite positive numeric weight; booleans are not measurements.
     elif kind == "weight":
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 < value < 1000:
             raise ValueError("Invalid weight.")
+    # Start with the main answer field, then permit only the extra fields relevant to this question.
     allowed = {"answer"}
     if kind == "period" and value != "None":
         allowed.add("flow")
@@ -91,6 +97,7 @@ def validate_entry(day, question, answer):
         allowed.add("unit")
         if not isinstance(answer.get("unit"), str) or answer["unit"] not in UNITS:
             raise ValueError("Invalid weight unit.")
+    # Sleep duration is optional, but when supplied it must be a finite number between zero and 24 hours.
     if kind == "sleep":
         allowed.add("hours")
         if "hours" in answer:
@@ -101,6 +108,7 @@ def validate_entry(day, question, answer):
         allowed.add("detail")
         if "detail" in answer and (not isinstance(answer["detail"], str) or len(answer["detail"]) > 500):
             raise ValueError("Invalid UTI detail.")
+    # Reject unrelated extra fields rather than silently storing unexpected information.
     if set(answer) - allowed:
         raise ValueError("Fields do not match this question.")
     return {"day": day, "question": question, "answer": dict(answer)}
