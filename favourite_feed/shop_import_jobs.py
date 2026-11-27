@@ -46,7 +46,8 @@ def step(sid):
     pending = json.loads(row["pending"])
     if not pending and not row["last_page"]:
         page = etsy_get(f"shops/{sid}/listings/active", {"limit":100,"offset":row["offset"],"sort_on":"created","sort_order":"desc"})
-        pending = page["results"]
+        # Copy the response list because processing removes items from the pending queue.
+        pending = list(page["results"])
         with connect_database() as conn:
             conn.execute("UPDATE shop_import_jobs SET pending=?,offset=?,total=?,last_page=? WHERE shop_id=?",
                          (json.dumps(pending),row["offset"]+len(pending),page.get("count"),int(len(pending)<100),sid))
