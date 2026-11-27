@@ -9,6 +9,7 @@ import math
 # Map each supported diary question to its answer type; keep these names aligned with the browser.
 QUESTIONS = {
     "Hot flushes": "yesno", "Night sweats": "yesno",
+    "Did you drink alcohol yesterday?": "yesno",
     "Period / bleeding today": "period",
     "Period start or end date": "date",
     "Cycle changes or irregular periods": "severity",
@@ -42,7 +43,7 @@ CHOICES = {
     "severity": {"None", "Mild", "Moderate", "Severe"},
     "period": {"None", "Period", "Spotting", "Unexpected"},
     "sleep": {"None", "Mild", "Moderate", "Severe"},
-    "uti": {"Suspected", "Confirmed", "Symptoms", "Resolved"},
+    "uti": {"None", "Suspected", "Confirmed", "Symptoms", "Resolved"},
     "libido": {"Low", "Usual", "Higher", "Fluctuating"},
 }
 FLOW = {"Light", "Medium", "Heavy", "Flooding"}
