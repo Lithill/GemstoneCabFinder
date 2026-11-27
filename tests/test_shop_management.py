@@ -3,7 +3,7 @@ from unittest.mock import patch
 from tempfile import TemporaryDirectory
 from pathlib import Path
 from favourite_feed import database
-from favourite_feed.shop_management import shop_name, add_shop, import_recent
+from favourite_feed.shop_management import shop_name, add_shop, import_recent, import_all
 
 class ShopManagementTests(unittest.TestCase):
     # Accept a plain shop name or valid Etsy shop URL and reject unrelated URLs and paths.
@@ -41,3 +41,18 @@ class ShopManagementTests(unittest.TestCase):
                     add_shop("ExampleShop", expected_id=999)
             with database.connect_database() as conn:
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM monitored_shops").fetchone()[0],0)
+
+    # Import multiple pages and confirm a repeat import never resets existing listing status.
+    def test_import_all_pages(self):
+        with TemporaryDirectory() as tmp, patch.object(database,"DB_PATH",Path(tmp)/"test.db"):
+            database.setup_database()
+            with patch("favourite_feed.shop_management.find_shop_by_name",return_value={"shop_id":123,"shop_name":"ExampleShop"}):
+                add_shop("ExampleShop")
+            listings = [{"listing_id":i,"title":"Example","creation_timestamp":100} for i in range(1,102)]
+            def page(path, params):
+                return {"results":listings[params["offset"]:params["offset"]+params["limit"]]}
+            with patch("favourite_feed.shop_management.etsy_get",side_effect=page), patch("favourite_feed.refresh.etsy_get",return_value={"results":[]}):
+                self.assertEqual(import_all(123),101)
+                self.assertEqual(import_all(123),0)
+            with database.connect_database() as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0],101)
