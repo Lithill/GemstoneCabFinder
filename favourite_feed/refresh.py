@@ -2,7 +2,7 @@
 import argparse
 import html
 from datetime import datetime, timezone, timedelta
-from favourite_feed.database import connect_database, setup_database
+from favourite_feed.database import ensure_shop_baseline, connect_database, setup_database
 from favourite_feed.etsy_api import etsy_get
 
 PAGE_SIZE = 100
@@ -54,9 +54,7 @@ def refresh_shop(shop):
     started = datetime.now(timezone.utc)
     with connect_database() as conn:
         conn.execute("BEGIN IMMEDIATE")
-        if "baseline_at" not in {r[1] for r in conn.execute("PRAGMA table_info(monitored_shops)")}:
-            conn.execute("ALTER TABLE monitored_shops ADD COLUMN baseline_at TEXT")
-            conn.execute("UPDATE monitored_shops SET baseline_at=last_checked WHERE last_checked IS NOT NULL")
+        ensure_shop_baseline(conn)
     if not shop["last_checked"]:
         with connect_database() as conn:
             conn.execute("UPDATE monitored_shops SET last_checked=?, baseline_at=? WHERE shop_id=?",
