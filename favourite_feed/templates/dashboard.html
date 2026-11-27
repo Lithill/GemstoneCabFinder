@@ -3,8 +3,8 @@
 <body><header><h1>My dashboard</h1><nav><a href="/">Gemstone Feed</a><a href="/refresh">Refresh</a></nav></header>
 <main class="dashboard">
 <p class="dashboard-intro">Your tools, all in one place.</p>
-<section class="dashboard-grid" aria-label="Your tools">
-<article class="dashboard-card">
+{# Render one card per dashboard tool; gemstone counts and refresh status come from Flask. #}<section class="dashboard-grid" aria-label="Your tools">
+{# The first card displays gemstone statistics and links to the main browsing workflows. #}<article class="dashboard-card">
 <div class="dashboard-symbol" aria-hidden="true">💎</div>
 <h2>Gemstone Feed</h2>
 <p>New finds from your favourite Etsy shops.</p>
@@ -29,6 +29,7 @@
 </section>
 </main>
 <script>
+// Convert the server timestamp to a UK-local display time.
 const t=document.getElementById('finished');
 if(t)t.textContent=new Date(t.dateTime).toLocaleString('en-GB',{timeZone:'Europe/London',dateStyle:'medium',timeStyle:'short'});
 </script><script src="{{ url_for('static',filename='refresh_worker.js') }}"></script>
