@@ -25,6 +25,11 @@ class HouseplantTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 303)
                 with closing(module.connection()) as conn:
                     self.assertEqual(conn.execute("SELECT COUNT(*) FROM plant_watering").fetchone()[0], 1)
+                response = client.post("/plants/1/water", data={"watered_on": date.today().isoformat()},
+                                       headers=headers, base_url="https://localhost")
+                self.assertEqual(response.status_code, 303)
+                with closing(module.connection()) as conn:
+                    self.assertEqual(conn.execute("SELECT COUNT(*) FROM plant_watering").fetchone()[0], 1)
                 # Seeding is idempotent, including after deleting a plant.
                 client.post("/plants/1/delete", headers=headers, base_url="https://localhost")
                 with closing(module.connection()) as conn:
