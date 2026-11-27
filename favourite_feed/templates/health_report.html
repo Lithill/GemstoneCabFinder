@@ -1,29 +1,29 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Health Tracker — appointment report</title><link rel="stylesheet" href="{{ url_for('static',filename='health_report.css') }}"></head>
 <body><main>
-<nav class="screen-only"><a href="/private-symptom-tracker">Return to Health Tracker</a><p>Review before sharing. Use your browser's Print option (Ctrl+P or Cmd+P) to print or save as PDF. Exported copies are not protected by the tracker encryption.</p></nav>
+{# Screen-only navigation and export warning; the print stylesheet hides this section. #}<nav class="screen-only"><a href="/private-symptom-tracker">Return to Health Tracker</a><p>Review before sharing. Use your browser's Print option (Ctrl+P or Cmd+P) to print or save as PDF. Exported copies are not protected by the tracker encryption.</p></nav>
 <h1>Health Tracker — appointment report</h1>
-<p>Patient-recorded diary · {{ report.start }} to {{ report.end }} ({{ report.days }} days, including today)</p>
+{# Display the server-calculated inclusive report date range and diary coverage. #}<p>Patient-recorded diary · {{ report.start }} to {{ report.end }} ({{ report.days }} days, including today)</p>
 <p>Diary coverage: {{ report.counts.diary }} of {{ report.days }} days. Missing records are not symptom-free days. Today's record may be incomplete.</p>
-<h2>Symptom history</h2>
+{# Display recorded severity statistics from Python, with averages formatted to two decimal places and an empty-state row when needed. #}<h2>Symptom history</h2>
 <p>Severity: 0 none, 1 mild, 2 moderate, 3 severe. Averages use recorded answers only.</p>
 <table><thead><tr><th>Symptom</th><th>Average / 3</th><th>Rated days</th><th>Severe days</th><th>None days</th></tr></thead><tbody>
 {% for r in report.symptoms %}<tr><th scope="row">{{ r.name }}</th><td>{{ "%.2f"|format(r.mean) }}</td><td>{{ r.n }}</td><td>{{ r.severe }}</td><td>{{ r.none }}</td></tr>{% else %}<tr><td colspan="5">No severity ratings recorded.</td></tr>{% endfor %}
 </tbody></table>
-<h2>Medication and supplement history</h2>
+{# Display the latest effective medication and supplement status, not confirmed adherence. #}<h2>Medication and supplement history</h2>
 <p>Latest recorded status as of report end; not a verified prescription or adherence record.</p>
 <table><thead><tr><th>Name</th><th>Status</th><th>Dose</th><th>Effective date</th></tr></thead><tbody>{% for e in report.current %}<tr><th scope="row">{{ e.name }}</th><td>{{ e.status }}</td><td>{{ e.dose }}</td><td>{{ e.day }}</td></tr>{% else %}<tr><td colspan="4">No recorded medication or supplement history.</td></tr>{% endfor %}</tbody></table>
-<h3>Changes during report period</h3>
+{# List dated changes occurring within the report window separately from the latest status. #}<h3>Changes during report period</h3>
 {% for e in report.changes %}<p>{{ e.day }} — {{ e.name }}: {{ e.status }} {{ e.dose }}</p>{% else %}<p>No dated changes recorded.</p>{% endfor %}
-<h2>Exercise and bleeding records</h2>
+{# Display activity and bleeding counts; subtract explicitly recorded categories from the report length to show missing days. #}<h2>Exercise and bleeding records</h2>
 <p>Exercise: {{ report.counts.active }} active days, {{ report.counts.rest }} rest days, {{ report.counts.minutes }} total recorded minutes. {{ report.days-report.counts.active-report.counts.rest }} days without activity/rest records.</p>
 <p>Bleeding: {{ report.counts.period }} period days, {{ report.counts.spotting }} spotting days, {{ report.counts.unexpected }} unexpected bleeding days, {{ report.counts.no_bleeding }} explicitly no-bleeding days. {{ report.days-report.counts.period-report.counts.spotting-report.counts.unexpected-report.counts.no_bleeding }} days without bleeding records.</p>
-{% for e in report.period_events %}<p>Recorded {{ e.day }}: {{ e.value }} ({{ e.details|join(", ") }})</p>{% endfor %}
-<h2>Monthly symptom trends</h2>
+{# Display explicit recorded period start/end events and their details. #}{% for e in report.period_events %}<p>Recorded {{ e.day }}: {{ e.value }} ({{ e.details|join(", ") }})</p>{% endfor %}
+{# Group server-calculated symptom averages by month; boundary months can be incomplete. #}<h2>Monthly symptom trends</h2>
 <p>Months at the boundaries may be partial. Counts show the number of ratings, not total calendar days.</p>
 {% for m in report.monthly %}<h3>{{ m.month }}</h3><table><thead><tr><th>Symptom</th><th>Average / 3</th><th>Rated days</th></tr></thead><tbody>{% for r in m.rows %}<tr><th scope="row">{{ r.name }}</th><td>{{ "%.2f"|format(r.mean) }}</td><td>{{ r.n }}</td></tr>{% endfor %}</tbody></table>{% else %}<p>No monthly ratings available.</p>{% endfor %}
-<h2>Exploratory exercise associations</h2>
+{# Display qualifying exercise/rest comparisons supplied by Python, including lag and sample sizes. #}<h2>Exploratory exercise associations</h2>
 <p>Up to eight comparisons with at least five ratings per group and a difference of at least 0.5 points. Other factors and reverse causation may explain differences. These are not clinical conclusions or exercise recommendations.</p>
 {% for r in report.associations %}<p>{{ r.name }} — {{ r.lag }} day(s) after activity/rest: rest {{ "%.2f"|format(r.rest) }} ({{ r.rest_n }} ratings), exercise {{ "%.2f"|format(r.active) }} ({{ r.active_n }} ratings).</p>{% else %}<p>No comparisons met the descriptive threshold.</p>{% endfor %}
-<p class="footnote">Patient-generated summary for discussion with a healthcare professional. Not a diagnosis or verified medical record.</p>
+{# Retain the report's limitations in both screen and printed versions. #}<p class="footnote">Patient-generated summary for discussion with a healthcare professional. Not a diagnosis or verified medical record.</p>
 </main></body></html>
