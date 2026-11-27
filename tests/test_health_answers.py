@@ -5,10 +5,10 @@ from favourite_feed.health_answers import QUESTIONS, validate_entry
 
 
 class SymptomAnswerTests(unittest.TestCase):
-    # Check the expected 38 questions and eight answer types.
+    # Check the expected 39 questions and eight answer types.
     def test_all_current_question_types_are_covered(self):
         self.assertEqual(set(QUESTIONS.values()), {"yesno", "period", "date", "severity", "sleep", "uti", "libido", "weight"})
-        self.assertEqual(len(QUESTIONS), 38)
+        self.assertEqual(len(QUESTIONS), 39)
 
     # Validate examples of every answer type and ensure the returned answer is a separate object.
     def test_valid_answers_are_canonical_and_do_not_mutate_input(self):
@@ -16,6 +16,8 @@ class SymptomAnswerTests(unittest.TestCase):
             ("Hot flushes", {"answer": "Yes"}),
             ("Did you drink alcohol yesterday?", {"answer": "Yes"}),
             ("Did you drink alcohol yesterday?", {"answer": "No"}),
+            ("Did you have a nap today?", {"answer": "Yes"}),
+            ("Did you have a nap today?", {"answer": "No"}),
             ("UTI episode / recurrent UTIs", {"answer": "None"}),
             ("Brain fog", {"answer": "Moderate"}),
             ("Period / bleeding today", {"answer": "Period", "flow": "Heavy"}),
