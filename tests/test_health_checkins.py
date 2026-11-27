@@ -12,6 +12,7 @@ from favourite_feed import health_checkins, health_entries, health_vault
 
 
 class OfflineCheckinTests(unittest.TestCase):
+    # Create a temporary encrypted vault for each fictional check-in test.
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.db = Path(self.temp.name) / "synthetic-vault.db"
@@ -19,10 +20,12 @@ class OfflineCheckinTests(unittest.TestCase):
         self.environment.start()
         health_vault.provision(self.db)
 
+    # Remove test files and restore the environment.
     def tearDown(self):
         self.environment.stop()
         self.temp.cleanup()
 
+    # Save multiple answers together and edit one without removing the others.
     def test_multi_question_checkin_and_same_day_edit(self):
         day = "2026-11-21"
         answers = {
@@ -41,6 +44,7 @@ class OfflineCheckinTests(unittest.TestCase):
         self.assertNotIn(b"Brain fog", raw)
         self.assertNotIn(b"Severe", raw)
 
+    # An invalid answer must prevent the entire batch from being saved.
     def test_invalid_question_rejects_whole_checkin(self):
         day = "2026-11-21"
         with self.assertRaises(ValueError):
@@ -51,6 +55,7 @@ class OfflineCheckinTests(unittest.TestCase):
         self.assertIsNone(health_entries.get_validated(day, "Hot flushes", path=self.db))
         self.assertIsNone(health_entries.get_validated(day, "Brain fog", path=self.db))
 
+    # An invalid second answer must prevent changes to an existing first answer.
     def test_invalid_edit_keeps_existing_answers(self):
         day = "2026-11-21"
         health_checkins.put_checkin(day, {"Hot flushes": {"answer": "Yes"}}, path=self.db)
@@ -61,6 +66,7 @@ class OfflineCheckinTests(unittest.TestCase):
             }, path=self.db)
         self.assertEqual(health_entries.get_validated(day, "Hot flushes", path=self.db), {"answer": "Yes"})
 
+    # Use a SQLite trigger to simulate a later insert failure and verify the transaction rolls back.
     def test_database_failure_rolls_back_entire_checkin(self):
         """A database error on a later row must undo earlier inserts."""
         day = "2026-11-21"
@@ -82,12 +88,14 @@ class OfflineCheckinTests(unittest.TestCase):
         self.assertEqual(health_entries.get_validated(day, "Brain fog", path=self.db), {"answer": "Mild"})
         self.assertIsNone(health_entries.get_validated(day, "Hot flushes", path=self.db))
 
+    # A check-in must not create an unprovisioned database.
     def test_missing_vault_is_not_created(self):
         missing = Path(self.temp.name) / "not-provisioned.db"
         with self.assertRaises(FileNotFoundError):
             health_checkins.put_checkin("2026-11-21", {"Brain fog": {"answer": "Mild"}}, path=missing)
         self.assertFalse(missing.exists())
 
+    # Reject writes with the wrong key and preserve existing data.
     def test_wrong_key_does_not_change_existing_entries(self):
         day = "2026-11-21"
         health_checkins.put_checkin(day, {"Brain fog": {"answer": "Mild"}}, path=self.db)
@@ -96,6 +104,7 @@ class OfflineCheckinTests(unittest.TestCase):
                 health_checkins.put_checkin(day, {"Brain fog": {"answer": "Severe"}}, path=self.db)
         self.assertEqual(health_entries.get_validated(day, "Brain fog", path=self.db), {"answer": "Mild"})
 
+    # Even an empty submission must verify the vault and key.
     def test_empty_checkin_is_noop_only_with_valid_vault(self):
         self.assertEqual(health_checkins.put_checkin("2026-11-21", {}, path=self.db), 0)
         missing = Path(self.temp.name) / "no-vault.db"
@@ -106,6 +115,7 @@ class OfflineCheckinTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 health_checkins.put_checkin("2026-11-21", {}, path=self.db)
 
+    # Compare encrypted rows before and after an empty submission to confirm nothing changed.
     def test_empty_checkin_preserves_existing_encrypted_rows(self):
         day = "2026-11-21"
         health_checkins.put_checkin(day, {
@@ -123,6 +133,7 @@ class OfflineCheckinTests(unittest.TestCase):
             ).fetchall()
         self.assertEqual(after, before)
 
+    # Reject an incompatible schema even when no answers are submitted.
     def test_empty_checkin_rejects_unverified_vault_schema(self):
         invalid = Path(self.temp.name) / "wrong-schema.db"
         with closing(sqlite3.connect(invalid)) as conn, conn:
@@ -135,6 +146,7 @@ class OfflineCheckinTests(unittest.TestCase):
                 ["day", "question", "answer"],
             )
 
+    # Validate the date even for empty check-ins.
     def test_empty_checkin_rejects_invalid_calendar_dates(self):
         for invalid_day in (None, 20261121, "", "not-a-date", "2026-02-30", "2026-1-2"):
             with self.subTest(day=invalid_day):
@@ -142,6 +154,7 @@ class OfflineCheckinTests(unittest.TestCase):
                     health_checkins.put_checkin(invalid_day, {}, path=self.db)
         self.assertEqual(health_checkins.put_checkin("2026-11-21", {}, path=self.db), 0)
 
+    # Reject incorrect container types and unknown questions.
     def test_empty_checkin_rejects_bad_input(self):
         for invalid in (None, [], {"not a question": {"answer": "Yes"}}):
             with self.subTest(invalid=invalid):
