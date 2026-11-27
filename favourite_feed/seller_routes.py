@@ -1,7 +1,7 @@
 """Seller management routes, registered with the shared refresh lock."""
 import json
 from werkzeug.exceptions import HTTPException
-from flask import request, abort, jsonify, render_template
+from flask import request, abort, jsonify, render_template, redirect, url_for
 from favourite_feed.database import connect_database
 
 
@@ -37,11 +37,11 @@ def register_seller_routes(app, refresh_lock):
                 elif operation=="step":
                     return jsonify(message=discovery.step())
                 elif operation == "favourite_import_all":
-                    from favourite_feed.shop_management import import_all
+                    from favourite_feed import shop_import_jobs
                     sid = int(request.form.get("shop_id",""))
                     discovery.review(sid,"favourite")
-                    count = import_all(sid)
-                    message = f"Shop added to favourites. Imported {count} additional listings into Unseen."
+                    shop_import_jobs.start(sid)
+                    return redirect(url_for("shop_import", sid=sid))
                 elif operation in ("favourite","reject"):
                     discovery.review(int(request.form.get("shop_id","")),operation)
                     message="Shop added to favourites." if operation=="favourite" else "Shop rejected."
@@ -78,7 +78,7 @@ def register_seller_routes(app, refresh_lock):
     @app.route("/favourite-shops", methods=["GET", "POST"])
     # Display monitored sellers and handle adding, pausing, resuming or importing recent listings.
     def favourite_shops():
-        from favourite_feed.shop_management import add_shop, import_recent, import_all
+        from favourite_feed.shop_management import add_shop, import_recent
         from urllib.parse import urlsplit
         message = ""
         if request.method == "POST":
@@ -99,8 +99,9 @@ def register_seller_routes(app, refresh_lock):
                 elif operation in ("pause","resume","import","import_all"):
                     sid = int(request.form.get("shop_id",""))
                     if operation == "import_all":
-                        count = import_all(sid)
-                        message = f"Imported {count} additional listings into Unseen."
+                        from favourite_feed import shop_import_jobs
+                        shop_import_jobs.start(sid)
+                        return redirect(url_for("shop_import", sid=sid))
                     elif operation == "import":
                         count = import_recent(sid,int(request.form.get("limit","0")))
                         message = f"Imported {count} additional listings."
@@ -125,3 +126,34 @@ def register_seller_routes(app, refresh_lock):
             shops = conn.execute("""SELECT s.*, (SELECT COUNT(*) FROM listings l WHERE l.shop_id=s.shop_id) AS listing_count
                 FROM monitored_shops s ORDER BY is_active DESC, shop_name COLLATE NOCASE""").fetchall()
         return render_template("favourite_shops.html", shops=shops, message=message)
+
+
+    @app.route("/shop-import/<int:sid>", methods=["GET","POST"])
+    def shop_import(sid):
+        from favourite_feed import shop_import_jobs
+        from urllib.parse import urlsplit
+        if request.method == "POST":
+            source = urlsplit(request.headers.get("Origin") or request.headers.get("Referer") or "")
+            expected = urlsplit(request.host_url)
+            if (source.scheme,source.netloc)!=(expected.scheme,expected.netloc):
+                abort(403)
+            if not refresh_lock.acquire(blocking=False):
+                return jsonify(error="Another operation is running. Resume shortly."),409
+            try:
+                return jsonify(shop_import_jobs.step(sid))
+            except ValueError as exc:
+                return jsonify(error=str(exc)),400
+            except Exception:
+                app.logger.exception("Shop import step failed")
+                return jsonify(error="Import paused after an error. Saved progress retained; resume later."),503
+            finally:
+                refresh_lock.release()
+        try:
+            progress = shop_import_jobs.status(sid)
+        except ValueError:
+            abort(404)
+        with connect_database() as conn:
+            shop = conn.execute("SELECT shop_name FROM monitored_shops WHERE shop_id=?", (sid,)).fetchone()
+        if not shop:
+            abort(404)
+        return render_template("shop_import.html", shop=shop, progress=progress)
