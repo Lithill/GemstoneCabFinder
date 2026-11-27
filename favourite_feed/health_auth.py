@@ -18,6 +18,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from favourite_feed.health_vault import verify_password, _key
 
 health_auth = Blueprint("health_auth", __name__, url_prefix="/health-auth")
+# These settings apply to the separate tracker-login mode, not the hosting provider's site password.
 COOKIE = "__Host-health_session"
 SESSION_IDLE_SECONDS = 20 * 60
 MAX_FAILURES = 5
@@ -37,6 +38,7 @@ LOGIN_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <button type="submit">Sign in</button></form></main></body></html>"""
 
 
+# Require a separate signing secret before creating or checking session tokens.
 def _secret():
     secret = os.environ.get("HEALTH_SESSION_SECRET", "")
     if len(secret) < 43:
@@ -44,6 +46,7 @@ def _secret():
     return secret
 
 
+# Use a purpose-specific salt to distinguish login tokens from session tokens.
 def _signer(salt):
     return URLSafeTimedSerializer(_secret(), salt=salt)
 
@@ -71,6 +74,7 @@ def _identity():
     return hmac.new(_secret().encode(), address.encode(), hashlib.sha256).hexdigest()
 
 
+# Store login attempt limits and revoked sessions in a separate private SQLite database.
 def _rate_connection():
     RATE_DB.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(RATE_DB.parent, 0o700)
@@ -91,6 +95,7 @@ def _locked(identity, now):
         return bool(row and row[1] > now)
 
 
+# Count unsuccessful logins and temporarily lock further attempts after the configured threshold.
 def _failure(identity, now):
     with closing(_rate_connection()) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
@@ -107,6 +112,7 @@ def _clear_failures(identity):
         conn.execute("DELETE FROM attempts WHERE identity=?", (identity,))
 
 
+# Secure restricts cookies to HTTPS; HttpOnly prevents script access; Strict limits cross-site sending.
 def _cookie(response, token=None, *, clear=False):
     if token:
         response.set_cookie(COOKIE, token, secure=True, httponly=True, samesite="Strict", path="/")
@@ -122,16 +128,19 @@ def _nonce_hash(nonce):
     return hmac.new(_secret().encode(), nonce.encode(), hashlib.sha256).hexdigest()
 
 
+# Record a signed session's identifier so logging out invalidates that token until it expires.
 def _revoke(nonce):
     with closing(_rate_connection()) as conn, conn:
         conn.execute("INSERT OR REPLACE INTO revoked_sessions VALUES (?, ?)", (_nonce_hash(nonce), int(time.time()) + SESSION_IDLE_SECONDS))
         conn.execute("DELETE FROM revoked_sessions WHERE expires_at < ?", (int(time.time()),))
 
 
+# Select the hosting provider's site-wide authentication instead of the separate tracker login.
 def site_auth_mode():
     return os.environ.get("HEALTH_SITE_AUTH_ENABLED") == "1"
 
 
+# Check the configured access mode. Site mode relies on upstream authentication; HTTPS alone is not authentication.
 def _valid_session():
     if site_auth_mode():
         # Deployment prerequisite: verified upstream authentication on every URL.
@@ -147,6 +156,7 @@ def _valid_session():
     # Configuration removal or corruption must invalidate existing sessions too.
     if not credentials_ready():
         return None
+    # In separate-login mode, check the signed cookie's age, contents and revocation status.
     token = request.cookies.get(COOKIE, "")
     if not token:
         return None
@@ -162,6 +172,7 @@ def _valid_session():
     return None
 
 
+# A decorator wraps protected page functions and denies access before rendering if the session check fails.
 def require_health_login(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -179,6 +190,7 @@ def login():
         abort(503)
     identity = _identity()
     now = int(time.time())
+    # Create a short-lived login form token; POST must return the matching cookie and form value.
     if request.method == "GET":
         csrf = _signer("health-login-csrf-v1").dumps({"nonce": secrets.token_urlsafe(24)})
         response = make_response(render_template_string(LOGIN_HTML, csrf=csrf, error=False))
@@ -241,6 +253,7 @@ def logout():
     return _cookie(make_response(redirect(url_for("health_auth.login"), code=303)), clear=True)
 
 
+# CSRF protection helps prevent another website from submitting unwanted changes through your browser.
 def health_csrf_required():
     """For future write endpoints: verify a session-bound CSRF token."""
     current = _valid_session()
