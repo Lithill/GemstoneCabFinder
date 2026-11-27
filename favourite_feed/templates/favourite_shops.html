@@ -2,13 +2,13 @@
 <body><header><h1>Manage favourite shops</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a><a href="/refresh">Refresh</a></nav></header>
 {# Provide a form for adding a shop by exact name or Etsy URL. #}<main class="dashboard"><section class="dashboard-card"><h2>Add an Etsy shop</h2>
 <form method="post"><input type="hidden" name="operation" value="add"><label for="shop">Exact shop name or Etsy shop URL</label><input id="shop" name="shop" required maxlength="500" placeholder="https://www.etsy.com/shop/ShopName"><button type="submit">Add shop</button></form>
-<p>New shops monitor future listings from the time they are added. To bring in existing listings, use Import recent below. Existing listings and favourites are never deleted.</p>
+<p>New shops monitor future listings from the time they are added. To bring in existing listings, use Import recent or Import all below. Existing listings and favourites are never deleted.</p>
 {% if message %}<p role="status">{{ message }}</p>{% endif %}</section>
 <h2>Monitored shops ({{ shops|length }})</h2>
 {# Render monitored shops with their current active status and collected listing count. #}{% for shop in shops %}<article class="dashboard-card"><h3><a href="https://www.etsy.com/shop/{{ shop.shop_name|urlencode }}" target="_blank" rel="noopener noreferrer">{{ shop.shop_name }}</a></h3>
 <p>{{ "Active" if shop.is_active else "Paused" }} · {{ shop.listing_count }} collected listings</p>
 {# Toggle monitoring without deleting previously collected listings. #}<form method="post"><input type="hidden" name="shop_id" value="{{ shop.shop_id }}"><button name="operation" value="{{ 'pause' if shop.is_active else 'resume' }}">{{ "Pause monitoring" if shop.is_active else "Resume monitoring" }}</button></form>
-{# Request an explicit import of five, ten or twenty recent active listings for this shop. #}<form method="post"><input type="hidden" name="shop_id" value="{{ shop.shop_id }}"><label for="limit-{{ shop.shop_id }}">Import recent active listings</label><select name="limit" id="limit-{{ shop.shop_id }}"><option>5</option><option selected>10</option><option>20</option></select><button name="operation" value="import">Import recent</button></form>
+{# Request an explicit import of five, ten or twenty recent active listings for this shop. #}<form method="post"><input type="hidden" name="shop_id" value="{{ shop.shop_id }}"><label for="limit-{{ shop.shop_id }}">Import recent active listings</label><select name="limit" id="limit-{{ shop.shop_id }}"><option>5</option><option selected>10</option><option>20</option></select><button name="operation" value="import">Import recent</button><button name="operation" value="import_all">Import all active listings</button></form>
 </article>{% else %}<p>No monitored shops yet.</p>{% endfor %}
-<p>Recent imports use Etsy's creation sort, which can include renewed listings. Existing listing IDs are skipped. Imports may take time; wait for the result before repeating.</p>
+<p>Recent imports use Etsy's creation sort, which can include renewed listings. Existing listing IDs are skipped. All-listing imports may take a long time for large shops. If interrupted, retry to skip already saved listings. Imports may take time; wait for the result before repeating.</p>
 </main></body></html>
