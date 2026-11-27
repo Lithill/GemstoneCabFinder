@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Listing imports</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head>
+<body><header><h1>Listing imports</h1><nav><a href="/dashboard">Dashboard</a><a href="/favourite-shops">Favourite shops</a><a href="/discover">Discover</a><a href="/">Gemstone Feed</a></nav></header>
+<main class="dashboard">
+<p>Latest saved import for each shop. Imports need their progress page open to continue. Unfinished imports can be resumed; completed imports stay listed until a new import is started for that shop.</p>
+<p>{{ jobs|rejectattr('done')|list|length }} unfinished · {{ jobs|selectattr('done')|list|length }} completed</p>
+<p><a href="{{ url_for('shop_imports') }}">Refresh saved status</a></p>
+{# Show persisted counts, not a guess about whether another browser tab is currently running. #}
+{% for job in jobs %}
+<article class="dashboard-card"><h2>{{ job.shop_name }}</h2>
+<p><strong>{{ 'Completed' if job.done else 'Unfinished — resumable' }}</strong></p>
+{% if job.done %}<progress max="1" value="1" aria-label="Completed" style="width:100%"></progress>
+{% elif job.total %}<progress max="{{ [job.total,job.processed]|max }}" value="{{ job.processed }}" aria-label="Listings processed" style="width:100%"></progress>{% endif %}
+<p>{{ job.processed }}{% if job.total is not none %} of {{ job.total }}{% endif %} processed · {{ job.imported }} imported · {{ job.skipped }} skipped</p>
+<div class="dashboard-links"><a class="dashboard-primary" href="{{ url_for('shop_import',sid=job.shop_id) }}">{{ 'View result' if job.done else 'Open / resume import' }}</a></div>
+</article>
+{% else %}<p>No saved imports yet. Start one from Favourite shops or Discover.</p>{% endfor %}
+</main></body></html>
