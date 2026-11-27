@@ -1,7 +1,7 @@
 import re
 from urllib.parse import urlsplit
 from datetime import datetime, timezone
-from favourite_feed.database import connect_database
+from favourite_feed.database import ensure_shop_baseline, connect_database
 from favourite_feed.etsy_api import etsy_get, find_shop_by_name
 from favourite_feed.refresh import store_listing
 
@@ -32,9 +32,7 @@ def add_shop(value, *, expected_id=None):
     now = datetime.now(timezone.utc).isoformat()
     with connect_database() as conn:
         conn.execute("BEGIN IMMEDIATE")
-        if "baseline_at" not in {r[1] for r in conn.execute("PRAGMA table_info(monitored_shops)")}:
-            conn.execute("ALTER TABLE monitored_shops ADD COLUMN baseline_at TEXT")
-            conn.execute("UPDATE monitored_shops SET baseline_at=last_checked WHERE last_checked IS NOT NULL")
+        ensure_shop_baseline(conn)
         result = conn.execute("""INSERT INTO monitored_shops
             (shop_id,shop_name,shop_url,added_at,last_checked,baseline_at,is_active)
             VALUES (?,?,?,?,?,?,1) ON CONFLICT(shop_id) DO NOTHING""",
