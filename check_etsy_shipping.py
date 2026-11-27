@@ -3,6 +3,7 @@ import os
 import requests
 from dotenv import load_dotenv
 
+# Load API credentials from the environment.
 load_dotenv()
 
 api_key = os.getenv("ETSY_API_KEY")
@@ -17,6 +18,7 @@ headers = {
 
 url = "https://openapi.etsy.com/v3/application/listings/active"
 
+# Request a single live listing to inspect the available shipping-related fields.
 response = requests.get(
     url,
     headers=headers,
@@ -44,6 +46,7 @@ print("\nListing ID:", listing.get("listing_id"))
 print("Shop ID:", listing.get("shop_id"))
 
 print("\nShipping-related fields:")
+# Print matching field names and values; this is not a verified delivery or postage calculation.
 for key, value in listing.items():
     if any(word in key.lower() for word in (
         "shipping", "delivery", "postage",
