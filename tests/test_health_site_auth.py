@@ -8,6 +8,7 @@ from favourite_feed.health_staging import create_staging_app
 from favourite_feed.health_vault import provision
 
 class SiteAuthTests(unittest.TestCase):
+    # Test the application-side HTTPS and CSRF requirements of site-auth mode using a fictional vault; this does not exercise the hosting provider's upstream password gate.
     def test_site_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
             vault = Path(tmp) / "fictional.db"
