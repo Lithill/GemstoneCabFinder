@@ -1,7 +1,6 @@
 from datetime import timedelta
 from statistics import mean
-from favourite_feed.health_answers import QUESTIONS
-from favourite_feed.health_impact import SCORES
+from favourite_feed.health_summary import severity_score, count_bleeding, count_exercise
 from favourite_feed.health_ongoing import effective
 from favourite_feed.health_exercise import compare_exercise
 
@@ -18,21 +17,14 @@ def build_report(today, days, items, read_day, read_exercise):
         counts["diary"] += bool(entries)
         for e in entries:
             name, value = e["name"], e["answer"]
-            if QUESTIONS.get(name) in ("severity","sleep") and value in SCORES:
-                ratings.setdefault(name,[]).append(SCORES[value])
-                monthly.setdefault(day[:7],{}).setdefault(name,[]).append(SCORES[value])
-            elif name == "Period / bleeding today":
-                key = {"Period":"period","Spotting":"spotting","Unexpected":"unexpected","None":"no_bleeding"}.get(value)
-                if key:
-                    counts[key] += 1
-            elif name == "Period start or end date":
+            score = severity_score(name, value)
+            if score is not None:
+                ratings.setdefault(name,[]).append(score)
+                monthly.setdefault(day[:7],{}).setdefault(name,[]).append(score)
+            count_bleeding(counts, name, value)
+            if name == "Period start or end date":
                 events.append(dict(day=day,value=value,details=e["extras"]))
-        if log:
-            if log["rest"]:
-                counts["rest"] += 1
-            elif log["sessions"]:
-                counts["active"] += 1
-                counts["minutes"] += sum(s["minutes"] for s in log["sessions"])
+        count_exercise(counts, log)
     symptoms = [dict(name=name,mean=mean(v),n=len(v),severe=v.count(3),none=v.count(0)) for name,v in ratings.items()]
     symptoms.sort(key=lambda r:(-r["mean"],r["name"]))
     current = []
