@@ -1,5 +1,6 @@
 """Visual clues for quiz learning, not definitive photo identification."""
 
+# Each dictionary key is a gemstone name and its value is a learning hint shown in the quiz or reference library.
 TIPS = {
     "Amethyst": "Look for violet to purple quartz, often with uneven colour zoning and a glassy shine. Fluorite can look similar but commonly forms cubes and has prominent cleavage.",
     "Aquamarine": "Usually pale blue to blue-green and often relatively clear. Rough crystals can form long hexagonal prisms; blue topaz may look similar in cut stones.",
