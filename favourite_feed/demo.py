@@ -5,10 +5,13 @@ from favourite_feed import database
 from favourite_feed.etsy_api import etsy_get
 
 
+# Use a separate gemstone feed database for a local demonstration; this still makes real Etsy API requests.
 def main():
+    # Redirect feed database operations before initialising the schema.
     database.DB_PATH = database.PROJECT_ROOT / "data" / "favourite_feed_demo.db"
     database.setup_database()
     now = datetime.now(timezone.utc).isoformat()
+    # Seed example monitored shops and retrieve up to six active listings per shop.
     for shop_id, name in [(30037649, "999GEMS"), (17921936, "A2ZStones"),
                           (46474596, "AAjewelryIndonesia")]:
         with database.connect_database() as conn:
@@ -19,9 +22,11 @@ def main():
             "limit": 6, "sort_on": "created", "sort_order": "desc"})
         for item in data["results"]:
             lid = item["listing_id"]
+            # Skip listings already present before requesting their photographs.
             with database.connect_database() as conn:
                 if conn.execute("SELECT 1 FROM listings WHERE listing_id=?", (lid,)).fetchone():
                     continue
+            # Retrieve listing photographs and price fields for the demo.
             images = etsy_get(f"listings/{lid}/images")["results"]
             price = item.get("price") or {}
             with database.connect_database() as conn:
@@ -33,6 +38,7 @@ def main():
                      html.unescape(item.get("description") or ""), item.get("url"),
                      price.get("amount"), price.get("divisor"), price.get("currency_code"),
                      item["original_creation_timestamp"], now))
+                # Store available image URLs and ranks, ignoring duplicate image IDs.
                 for img in images:
                     url = img.get("url_fullxfull") or img.get("url_570xN")
                     if url:
@@ -40,6 +46,7 @@ def main():
                             (image_id, listing_id, image_url, image_rank)
                             VALUES (?, ?, ?, ?)""",
                             (img["listing_image_id"], lid, url, img.get("rank")))
+    # Import the application after setting the demo database path and launch on localhost only.
     from favourite_feed.web import app
     print("DEMO only: http://127.0.0.1:5001", flush=True)
     app.run(host="127.0.0.1", port=5001, debug=False)
