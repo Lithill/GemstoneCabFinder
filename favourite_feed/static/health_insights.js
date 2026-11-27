@@ -11,6 +11,7 @@
   const insightsTab = document.getElementById("insights-tab");
   const diaryPanel = document.getElementById("diary-panel");
   const insightsPanel = document.getElementById("insights-panel");
+  // Switch between diary and insights, hide other panels and update accessible tab states.
   function selectView(insights) {
     document.getElementById("factors-panel").hidden = true;
     document.getElementById("factors-tab").setAttribute("aria-pressed", "false");
@@ -24,14 +25,17 @@
   }
   diaryTab.addEventListener("click", () => selectView(false));
   insightsTab.addEventListener("click", () => selectView(true));
+  // Hold the loaded month in memory and use a sequence number to reject stale responses.
   let data = null, sequence = 0;
   month.value = dayInput.value.slice(0, 7);
+  // Rebuild the calendar and timeline from the current month and selected symptom.
   function draw() {
     calendar.replaceChildren();
     chart.replaceChildren();
     document.getElementById("insight-context").replaceChildren();
     if (!data) return;
     const [year, m] = month.value.split("-").map(Number);
+    // Calculate the number of days in the month and convert Sunday-first weekday numbering to Monday-first.
     const count = new Date(year, m, 0).getDate();
     const offset = (new Date(year, m - 1, 1).getDay() + 6) % 7;
     for (const name of ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]) {
@@ -40,6 +44,7 @@
       calendar.append(label);
     }
     for (let i = 0; i < offset; i++) calendar.append(document.createElement("span"));
+    // Create severity rows for explicit ratings; missing ratings leave cells blank.
     const levels = ["None", "Mild", "Moderate", "Severe"];
     const table = document.createElement("table");
     table.className = "insight-plot";
@@ -60,6 +65,7 @@
       }
     }
     const context = data.timeline || {};
+    // Convert recorded activity, bleeding and dated changes into compact timeline markers with descriptive labels.
     const contextRows = [
       ["Exercise", d => {
         const log = d.exercise;
@@ -85,10 +91,12 @@
     const detailBox=document.getElementById("insight-context");
     detailBox.replaceChildren();
     function add(parent,tag,value){const node=document.createElement(tag);node.textContent=value;parent.append(node);return node;}
+    // Display the effective ongoing factors at the start of the selected month.
     add(detailBox,"h3","Ongoing factors at start of month");
     if(!(data.baseline||[]).length)add(detailBox,"p","No ongoing factor recorded as of the first day.");
     for(const e of data.baseline||[])add(detailBox,"p",e.name+" — "+e.status+" "+e.dose+" (since "+e.day+")");
     add(detailBox,"h3","Recorded changes and activity");
+    // Show expandable daily details in chronological order.
     for(const [date,d] of Object.entries(context).sort((a,b)=>a[0].localeCompare(b[0]))){
       const lines=[];
       if(d.exercise)lines.push(contextRows[0][1](d)[1]);
@@ -104,6 +112,7 @@
       button.type = "button"; button.textContent = String(i);
       button.className = entry ? "insight-recorded" : "";
       button.setAttribute("aria-label", date + (entry ? ", " + entry.count + " recorded answers" : ", no recorded answers"));
+      // Open the selected day's diary through the existing date-change handler, preserving its unsaved-change safeguards.
       button.addEventListener("click", () => {
         if (dayInput.disabled) return;
         selectView(false);
@@ -115,6 +124,7 @@
     }
     status.textContent = Object.keys(data.days).length + " days with saved answers. Blank chart columns mean no recorded severity.";
   }
+  // Fetch private monthly data without caching and ignore responses superseded by a newer request.
   async function load() {
     const ticket = ++sequence;
     data = null; draw();
@@ -125,6 +135,7 @@
       const result = await response.json();
       if (ticket !== sequence) return;
       data = result;
+      // Preserve the selected symptom when it is still available in the new month.
       const previous = symptom.value;
       symptom.replaceChildren();
       for (const name of data.symptoms) {
@@ -139,5 +150,6 @@
   month.addEventListener("change", load);
   symptom.addEventListener("change", draw);
   document.getElementById("insight-refresh").addEventListener("click", load);
+  // Refresh visible insights after a diary save or deletion.
   document.addEventListener("tracker:saved", () => { if (!insightsPanel.hidden) load(); });
 })();
