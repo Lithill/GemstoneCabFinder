@@ -56,3 +56,10 @@ def setup_database():
             CREATE INDEX IF NOT EXISTS idx_listings_published
                 ON listings(published_at DESC);
         """)
+
+
+def ensure_shop_baseline(conn):
+    """Upgrade older gemstone databases inside the caller's write transaction."""
+    if "baseline_at" not in {row[1] for row in conn.execute("PRAGMA table_info(monitored_shops)")}:
+        conn.execute("ALTER TABLE monitored_shops ADD COLUMN baseline_at TEXT")
+        conn.execute("UPDATE monitored_shops SET baseline_at=last_checked WHERE last_checked IS NOT NULL")
