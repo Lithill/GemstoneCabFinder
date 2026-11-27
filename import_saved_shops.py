@@ -4,10 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
+# Legacy migration paths; this workbook is separate from the Windows path in main.py.
 database_file = "data/gemstone_sellers.db"
 excel_file = Path("output/gemstone_sellers_test.xlsx")
 history_file = Path("data/reviewed_shop_ids.txt")
 
+# Select the six legacy columns retained in the Shops sheet; other columns in that sheet are not preserved.
 columns = [
     "Shop Name",
     "Shop ID",
@@ -77,6 +79,7 @@ if exclusion_file.exists():
 
 new_rows = []
 
+# Skip previously reviewed, already listed, unnamed or excluded shops.
 for shop_id, shop_name, country, rating, reviews in saved_shops:
     shop_id_text = str(shop_id)
 
@@ -114,6 +117,7 @@ shops_df = pd.concat(
 sheets["Shops"] = shops_df
 
 # Save all existing worksheets, including shipping checks
+# Rewrite the workbook with all loaded worksheets, using the updated Shops data.
 with pd.ExcelWriter(excel_file, engine="openpyxl") as writer:
     for sheet_name, sheet_df in sheets.items():
         sheet_df.to_excel(
