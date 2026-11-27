@@ -5,6 +5,7 @@ def classify_wysiwyg(title, description="", rare_find=False):
     """Classify evidence that the buyer receives the pictured stone."""
     text = (str(title) + " " + str(description)).casefold()
 
+    # WYSIWYG means what you see is what you get. Negative evidence takes priority over positive wording.
     for phrase in WYSIWYG_NEGATIVE_PHRASES:
         if phrase in text:
             return "Likely random selection"
@@ -13,11 +14,13 @@ def classify_wysiwyg(title, description="", rare_find=False):
         if phrase in text:
             return "Likely WYSIWYG"
 
+    # A rare-find label is only a weaker clue, not proof that the photographed stone is supplied.
     if rare_find:
         return "Possible WYSIWYG - Rare find"
 
     return "Needs checking"
 
+# Use title wording to distinguish loose cabochons from finished jewellery; this is a heuristic, not image recognition.
 def is_loose_cabochon(title):
     title = title.casefold()
 
@@ -69,4 +72,5 @@ def is_loose_cabochon(title):
 
 
 
+# Higher numbers represent stronger pictured-stone evidence when comparing listings from one seller.
 EVIDENCE_RANK = {"Likely random selection": 0, "Needs checking": 1, "Possible WYSIWYG - Rare find": 2, "Likely WYSIWYG": 3}
