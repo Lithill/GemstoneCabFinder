@@ -36,6 +36,12 @@ def register_seller_routes(app, refresh_lock):
                 # The browser requests one search step at a time and receives a JSON progress message.
                 elif operation=="step":
                     return jsonify(message=discovery.step())
+                elif operation == "favourite_import_all":
+                    from favourite_feed.shop_management import import_all
+                    sid = int(request.form.get("shop_id",""))
+                    discovery.review(sid,"favourite")
+                    count = import_all(sid)
+                    message = f"Shop added to favourites. Imported {count} additional listings into Unseen."
                 elif operation in ("favourite","reject"):
                     discovery.review(int(request.form.get("shop_id","")),operation)
                     message="Shop added to favourites." if operation=="favourite" else "Shop rejected."
@@ -50,6 +56,8 @@ def register_seller_routes(app, refresh_lock):
             except Exception:
                 app.logger.exception("Discovery operation failed")
                 message="Operation failed. Search progress retained; try again later."
+                if request.form.get("operation")=="favourite_import_all":
+                    message="Import could not finish. If the shop was added, retry Import all from Favourite shops; saved listings are retained."
                 if request.form.get("operation")=="step":
                     return jsonify(error=message),503
             # Release the lock even if the operation fails or returns early.
@@ -70,7 +78,7 @@ def register_seller_routes(app, refresh_lock):
     @app.route("/favourite-shops", methods=["GET", "POST"])
     # Display monitored sellers and handle adding, pausing, resuming or importing recent listings.
     def favourite_shops():
-        from favourite_feed.shop_management import add_shop, import_recent
+        from favourite_feed.shop_management import add_shop, import_recent, import_all
         from urllib.parse import urlsplit
         message = ""
         if request.method == "POST":
@@ -88,9 +96,12 @@ def register_seller_routes(app, refresh_lock):
                 if operation == "add":
                     sid, created = add_shop(request.form.get("shop",""))
                     message = "Shop added. Future listings will be monitored." if created else "Shop already exists; its monitoring status is unchanged."
-                elif operation in ("pause","resume","import"):
+                elif operation in ("pause","resume","import","import_all"):
                     sid = int(request.form.get("shop_id",""))
-                    if operation == "import":
+                    if operation == "import_all":
+                        count = import_all(sid)
+                        message = f"Imported {count} additional listings into Unseen."
+                    elif operation == "import":
                         count = import_recent(sid,int(request.form.get("limit","0")))
                         message = f"Imported {count} additional listings."
                     # Pause or resume monitoring by changing the active flag, not deleting the shop or its listings.
