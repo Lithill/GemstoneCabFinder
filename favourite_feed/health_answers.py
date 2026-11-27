@@ -10,6 +10,7 @@ import math
 QUESTIONS = {
     "Hot flushes": "yesno", "Night sweats": "yesno",
     "Did you drink alcohol yesterday?": "yesno",
+    "Did you have a nap today?": "yesno",
     "Period / bleeding today": "period",
     "Period start or end date": "date",
     "Cycle changes or irregular periods": "severity",
