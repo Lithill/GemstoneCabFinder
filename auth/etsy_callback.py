@@ -3,8 +3,10 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 
+# Handle the browser redirect from Etsy using a local HTTP server.
 class EtsyCallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        # Accept only the callback path and parse its query parameters.
         parsed_url = urlparse(self.path)
 
         if parsed_url.path != "/callback":
@@ -18,6 +20,7 @@ class EtsyCallbackHandler(BaseHTTPRequestHandler):
             with open("etsy_oauth_state.json", "r") as file:
                 saved_security = json.load(file)
 
+            # Compare the returned state with the saved value before accepting the code.
             received_state = parameters["state"][0]
 
             # Check that the security state matches
@@ -27,6 +30,7 @@ class EtsyCallbackHandler(BaseHTTPRequestHandler):
                 return
 
             # Save the authorisation code for the token exchange
+            # Store the temporary authorisation code for the token exchange; treat this file as sensitive.
             with open("etsy_oauth_code.json", "w") as file:
                 json.dump({
                     "code": parameters["code"][0]
@@ -54,4 +58,5 @@ class EtsyCallbackHandler(BaseHTTPRequestHandler):
 
 
 print("Waiting for Etsy on http://localhost:8000/callback")
+# Start the blocking localhost listener; this legacy script runs it immediately.
 HTTPServer(("localhost", 8000), EtsyCallbackHandler).serve_forever()
