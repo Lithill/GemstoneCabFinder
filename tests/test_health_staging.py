@@ -13,6 +13,7 @@ from favourite_feed.health_vault import password_hash
 
 
 class PrivateTrackerIntegrationTests(unittest.TestCase):
+    # Create an isolated Flask preview with fictional login credentials and temporary rate-limit storage.
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -30,6 +31,7 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         app.config.update(TESTING=True, SERVER_NAME="localhost")
         self.client = app.test_client()
 
+    # Compare rendered private and public templates and check required client-script markers.
     def test_private_diary_controls_are_only_present_in_storage_staging(self):
         from pathlib import Path
         with patch.dict(os.environ, {"HEALTH_STAGING_STORAGE_ENABLED": "1"}):
@@ -49,6 +51,7 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         self.assertIn('tracker:diary-changed', client_script)
         self.assertIn('notes:""', client_script)
 
+    # Check that the public prototype retains its dashboard links without private account controls.
     def test_public_prototype_navigation_remains_unchanged(self):
         with self.client.application.test_request_context("/symptom-tracker"):
             html = render_template("symptom_tracker.html")
@@ -56,6 +59,7 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         self.assertIn('href="/"', html)
         self.assertNotIn("Private tracker account / Sign out", html)
 
+    # Check the preview page is GET-only and rejects POST; inspect the registered methods listed in the assertion.
     def test_private_preview_has_no_health_write_routes(self):
         rules = list(self.client.application.url_map.iter_rules())
         private = [rule for rule in rules if rule.rule == "/private-symptom-tracker"]
@@ -67,6 +71,7 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.client.post("/private-symptom-tracker",
                                          json={"answer": "private"}).status_code, 405)
 
+    # Check anonymous redirection and privacy-related response headers.
     def test_anonymous_user_cannot_view_tracker(self):
         response = self.client.get("/private-symptom-tracker")
         self.assertEqual(response.status_code, 303)
@@ -75,6 +80,7 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
         self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
 
+    # Exercise the legacy login, protected preview and logout with expected navigation and security headers.
     def test_login_unlocks_tracker_and_logout_locks_it_again(self):
         login_page = self.client.get("/health-auth/login")
         self.assertEqual(login_page.status_code, 200)
@@ -99,6 +105,7 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.client.post("/health-auth/logout", data={"csrf": logout_csrf}).status_code, 303)
         self.assertEqual(self.client.get("/private-symptom-tracker").status_code, 303)
 
+    # An existing session must stop granting access when required security settings become invalid.
     def test_existing_session_is_rejected_if_security_config_disappears(self):
         self.client.get("/health-auth/login")
         csrf = self.client.get_cookie("__Host-health_login_csrf").value
@@ -111,6 +118,7 @@ class PrivateTrackerIntegrationTests(unittest.TestCase):
         with patch.dict(os.environ, {"HEALTH_PASSWORD_HASH": ""}):
             self.assertEqual(self.client.get("/private-symptom-tracker").status_code, 303)
 
+    # Missing password configuration must prevent preview access and login.
     def test_missing_credentials_cannot_view_tracker(self):
         with patch.dict(os.environ, {"HEALTH_PASSWORD_HASH": ""}):
             self.assertEqual(self.client.get("/private-symptom-tracker").status_code, 303)
