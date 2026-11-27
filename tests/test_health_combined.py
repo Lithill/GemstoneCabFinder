@@ -3,6 +3,7 @@ from datetime import date
 from favourite_feed.health_combined import compare_combined
 
 class CombinedTests(unittest.TestCase):
+    # Group lagged exercise comparisons by bleeding context and medication changes, including changes between activity and outcome.
     def test_context_and_change_between_exposure_and_outcome(self):
         logs={"2026-01-09":{"rest":False,"sessions":[{}]},
               "2026-01-08":{"rest":True,"sessions":[]}}
@@ -16,6 +17,7 @@ class CombinedTests(unittest.TestCase):
         self.assertEqual(rows["No bleeding",False]["rest_n"],1)
         self.assertEqual(result["excluded"]["activity"],28)
 
+    # Exclude days without recorded bleeding status even when activity and symptoms are known.
     def test_unknown_bleeding_excluded(self):
         result=compare_combined(date(2026,1,10),30,0,"Fibromyalgia pain",[],
             lambda d:[{"name":"Fibromyalgia pain","answer":"None"}],
@@ -23,6 +25,7 @@ class CombinedTests(unittest.TestCase):
         self.assertEqual(result["excluded"]["bleeding"],30)
         self.assertTrue(all(r["rest"] is None for r in result["rows"]))
 
+    # Treat explicit no symptoms as zero and check the lower-severity classification with five observations per group.
     def test_zero_is_valid_and_threshold(self):
         def log(d):
             return {"rest":True,"sessions":[]} if d<"2026-01-06" else {"rest":False,"sessions":[{}]}
