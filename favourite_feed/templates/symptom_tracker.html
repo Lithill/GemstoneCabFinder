@@ -6,9 +6,9 @@
 <body><header><h1>Health Tracker</h1><nav>{% if site_auth %}<a href="/dashboard">Dashboard</a>{% elif private_preview %}<a href="{{ url_for('health_auth.home') }}">Private tracker account / Sign out</a>{% else %}<a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a>{% endif %}</nav></header>
 <main class="tracker">
 {% if storage_staging %}
-<div class="tracker-tabs" role="group" aria-label="Tracker views"><button type="button" id="diary-tab" aria-pressed="true" aria-controls="diary-panel">My diary</button><button type="button" id="insights-tab" aria-pressed="false" aria-controls="insights-panel">Calendar &amp; trends</button><button type="button" id="factors-tab" aria-pressed="false" aria-controls="factors-panel">Lifestyle &amp; changes</button><button type="button" id="impact-tab" aria-pressed="false" aria-controls="impact-panel">Impact analysis</button></div>
+{# Expose the additional tracker views only when private storage is enabled. #}<div class="tracker-tabs" role="group" aria-label="Tracker views"><button type="button" id="diary-tab" aria-pressed="true" aria-controls="diary-panel">My diary</button><button type="button" id="insights-tab" aria-pressed="false" aria-controls="insights-panel">Calendar &amp; trends</button><button type="button" id="factors-tab" aria-pressed="false" aria-controls="factors-panel">Lifestyle &amp; changes</button><button type="button" id="impact-tab" aria-pressed="false" aria-controls="impact-panel">Impact analysis</button></div>
 {% endif %}
-<div id="diary-panel">
+{# The diary panel is shared by the temporary design preview and the private storage mode. #}<div id="diary-panel">
 {% if storage_staging %}
 <div class="tracker-warning">{% if personal_diary %}<strong>Your private symptom diary.</strong>{% else %}<strong>Private test diary — fictional information only.</strong>{% endif %} Your selected date loads automatically before entering answers. Nothing is stored until you choose Save check-in. Free-text notes are not stored.</div>
 {% else %}
@@ -19,14 +19,14 @@
 <button type="button" id="guided-start" class="tracker-choice"><strong>Guided check-in</strong><span>Go through every question, one by one. Skip any question.</span></button>
 <button type="button" id="quick-start" class="tracker-choice"><strong>Quick entry</strong><span>Choose a symptom or measurement to record right now.</span></button>
 </div>
-<section id="guided" hidden aria-label="Guided check-in">
+{# JavaScript fills these placeholders one question at a time. #}<section id="guided" hidden aria-label="Guided check-in">
 <div class="tracker-toolbar"><button type="button" id="guided-exit">← Choose a mode</button><span id="guided-progress" aria-live="polite"></span></div>
 <progress id="guided-bar" value="0" max="1"></progress>
 <h2 id="guided-question"></h2><p id="guided-help"></p>
 <div id="guided-fields"></div>
 <div class="tracker-actions"><button type="button" id="guided-back">Back</button><button type="button" id="guided-skip">Skip</button><button type="button" id="guided-next" class="tracker-primary">Next</button></div>
 </section>
-<section id="quick" hidden aria-label="Quick symptom entry">
+{# JavaScript builds category, symptom and answer controls for individual entries. #}<section id="quick" hidden aria-label="Quick symptom entry">
 <div class="tracker-toolbar"><button type="button" id="quick-exit">← Choose a mode</button></div>
 <h2>Add an entry</h2>
 <div id="quick-category" role="group" aria-label="Category"></div>
@@ -35,7 +35,7 @@
 <button type="button" id="quick-add" class="tracker-primary">{% if storage_staging %}Add to selected day’s diary{% else %}Add to preview diary{% endif %}</button>
 </section>
 {% if storage_staging %}
-<section id="staging-storage" aria-label="Private staging check-ins">
+{# Private storage controls select a date and explicitly load or save its diary. #}<section id="staging-storage" aria-label="Private staging check-ins">
 <h2>My daily check-in</h2>
 <p>Today loads automatically. Choose another date to revisit it, or use Load saved day to retry. You can revisit and edit earlier check-ins. {% if not personal_diary %}This is still a fictional-data test environment.{% endif %}</p>
 <label for="staging-day">Check-in date</label>
@@ -48,7 +48,7 @@
 <p id="staging-status" role="status" aria-live="polite"></p>
 </section>
 {% endif %}
-<section id="summary" class="tracker-summary" aria-live="polite">
+{# Display the editable draft; clearing the screen is distinct from deleting stored answers. #}<section id="summary" class="tracker-summary" aria-live="polite">
 <h2>{% if storage_staging %}My diary{% else %}Preview diary{% endif %} <small id="entry-count">0 entries</small></h2>
 <p id="empty-diary">{% if storage_staging %}Your entries for the selected date will appear here after loading.{% else %}Your temporary entries will appear here. No data is stored.{% endif %}</p>
 <div id="diary-items"></div>
@@ -56,7 +56,7 @@
 </section>
 </div>
 {% if storage_staging %}
-<section id="insights-panel" hidden aria-label="Symptom insights">
+{# Calendar and trend controls are populated by the separate insights scripts. #}<section id="insights-panel" hidden aria-label="Symptom insights">
 <h2>Symptom calendar and trends</h2>
 <label for="insight-month">Month</label>
 <input type="month" id="insight-month">
@@ -79,7 +79,7 @@
 </section>
 {% endif %}
 {% if storage_staging %}
-<section id="factors-panel" hidden aria-label="Lifestyle and changes">
+{# Group exercise, ongoing changes and daily factors in the lifestyle view. #}<section id="factors-panel" hidden aria-label="Lifestyle and changes">
 <h2>Lifestyle &amp; changes</h2>
 <h3>Quick exercise check-in</h3>
 <label for="exercise-day">Date</label><input type="date" id="exercise-day">
@@ -111,7 +111,7 @@
 </section>
 {% endif %}
 {% if storage_staging %}
-<section id="impact-panel" hidden aria-label="Impact analysis">
+{# Provide report links and controls for descriptive comparisons of recorded data. #}<section id="impact-panel" hidden aria-label="Impact analysis">
 <h2>What seems to affect my symptoms?</h2>
 <h3>Health reports for appointments</h3>
 <p>Open a private printable summary of your symptoms, recorded medication and supplement history, exercise, bleeding and trends. Review before sharing; printed or PDF copies are not encrypted by the tracker.</p>
@@ -162,7 +162,7 @@
 {% endif %}
 <p class="tracker-footnote">{% if storage_staging %}{% if personal_diary %}Keep website password protection enabled. Backups are refreshed after diary changes; older copies may retain deleted answers until cleanup runs. {% else %}Private test mode. {% endif %}Saved answers are encrypted; free-text notes are never transmitted or saved. Removing an on-screen entry does not delete a previously saved answer. This is not a medical record or diagnostic tool.{% else %}This is a visual and interaction prototype, not a medical record or diagnostic tool. No account, database, cookies, local storage or health-data API is used for these entries.{% endif %}</p>
 </main>
-<script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
+{# Load the shared diary interface first; private API clients are loaded only when storage is enabled. #}<script src="{{ url_for('static',filename='symptom_tracker.js') }}" defer></script>
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_staging_client.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_insights.js') }}" defer></script>{% endif %}
 {% if storage_staging %}<script src="{{ url_for('static',filename='health_factors.js') }}" defer></script>{% endif %}
