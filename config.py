@@ -1,3 +1,4 @@
+# Gemstone names used by the legacy title filter and search-term generation.
 GEMSTONES = [
     "labradorite",
     "moss agate",
@@ -46,6 +47,7 @@ GEMSTONES = [
     "opalized petrified wood",
 ]
 
+# Build generic and gemstone-specific search terms, removing duplicates while retaining order.
 SEARCH_TERMS = list(dict.fromkeys(
     [
         "gemstone cabochon",
@@ -64,6 +66,7 @@ SEARCH_TERMS = list(dict.fromkeys(SEARCH_TERMS[:12] + [
     "opalized petrified wood",
 ]))
 
+# Human-readable country names for the legacy search settings display.
 TARGET_COUNTRIES = [
     "India",
     "United States",
@@ -71,6 +74,7 @@ TARGET_COUNTRIES = [
     "United Kingdom",
 ]
 
+# Words used to distinguish finished jewellery from loose stones.
 FINISHED_JEWELLERY_TERMS = [
     "ring",
     "rings",
@@ -88,6 +92,7 @@ FINISHED_JEWELLERY_TERMS = [
     "jewellery set",
 ]
 
+# Phrases suggesting the pictured stone is the actual item offered.
 WYSIWYG_POSITIVE_PHRASES = [
     "wysiwyg",
     "exact stone pictured",
@@ -99,6 +104,7 @@ WYSIWYG_POSITIVE_PHRASES = [
     "actual stone pictured",
 ]
 
+# Phrases suggesting random selection or representative photographs.
 WYSIWYG_NEGATIVE_PHRASES = [
     "randomly selected",
     "random selection",
@@ -113,11 +119,14 @@ WYSIWYG_NEGATIVE_PHRASES = [
     "colour may vary",
 ]
 
+# Minimum seller eligibility thresholds.
 MIN_SHOP_AGE_DAYS = 365
 MIN_SHOP_RATING = 4.5
 MIN_SHOP_REVIEWS = 20
+# Maximum marketplace listings requested per search term; zero shop inventory limit disables that optional scan.
 MAX_LISTINGS_TO_SEARCH = 300
 MAX_SHOP_LISTINGS_TO_SEARCH = 0
+# Allowed shipping-origin country codes, distinct from the buyer destination.
 TARGET_SHIPPING_COUNTRIES = {"IN", "US", "ID", "GB"}
 
 # UK delivery requirements
