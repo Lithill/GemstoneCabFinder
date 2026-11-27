@@ -1,8 +1,10 @@
 import json
 
+# Read the local token file without contacting Etsy.
 with open("etsy_tokens.json", "r") as file:
     token_data = json.load(file)
 
+# Report token presence and metadata, not token values; this does not verify current validity.
 print("Access token present:", bool(token_data.get("access_token")))
 print("Refresh token present:", bool(token_data.get("refresh_token")))
 print("Token type:", token_data.get("token_type", "Not specified"))
