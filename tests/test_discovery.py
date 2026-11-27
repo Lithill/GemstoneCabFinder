@@ -4,12 +4,15 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from favourite_feed import database, discovery
 
+# Exercise discovery with isolated databases and simulated Etsy responses rather than live requests.
 class DiscoveryTests(unittest.TestCase):
+    # Duplicate search terms should collapse to one entry, and blank input should be rejected.
     def test_terms(self):
         self.assertEqual(discovery.terms_from_text("opal\nopal\njasper"),["opal","jasper"])
         with self.assertRaises(ValueError):
             discovery.terms_from_text(" ")
 
+    # Discover a seller, reject it, then verify a later matching listing does not queue it again.
     def test_queue_and_rejection(self):
         with TemporaryDirectory() as tmp, patch.object(database,"DB_PATH",Path(tmp)/"test.db"):
             database.setup_database()
@@ -26,6 +29,7 @@ class DiscoveryTests(unittest.TestCase):
             with database.connect_database() as conn:
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM discovery_queue").fetchone()[0],0)
 
+    # A recently checked low-rated seller should not require another shop lookup.
     def test_checked_seller_cache(self):
         with TemporaryDirectory() as tmp, patch.object(database,"DB_PATH",Path(tmp)/"test.db"), patch.object(discovery,"legacy_exclusions",return_value=(set(),set())):
             database.setup_database()
@@ -42,6 +46,7 @@ class DiscoveryTests(unittest.TestCase):
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM discovery_queue").fetchone()[0],0)
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM discovery_checked").fetchone()[0],1)
 
+    # Improve evidence for an existing pending seller while keeping historical exclusions out of the queue.
     def test_stronger_evidence_and_history(self):
         with TemporaryDirectory() as tmp, patch.object(database,"DB_PATH",Path(tmp)/"test.db"), patch.object(discovery,"legacy_exclusions",return_value=({1,9},set())):
             database.setup_database()
@@ -57,6 +62,7 @@ class DiscoveryTests(unittest.TestCase):
                 self.assertEqual(tuple(row),("Likely WYSIWYG",3,"pending"))
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM discovery_queue").fetchone()[0],0)
 
+    # Import the snapshot twice and verify rejection decisions and monitored-shop exclusions survive.
     def test_import_preserves_decisions(self):
         from favourite_feed import import_review_list
         with TemporaryDirectory() as tmp, patch.object(database,"DB_PATH",Path(tmp)/"test.db"):
@@ -72,6 +78,7 @@ class DiscoveryTests(unittest.TestCase):
                 self.assertEqual(conn.execute("SELECT status FROM discovery_shops WHERE shop_id=60611701").fetchone()[0],"reject")
                 self.assertIsNone(conn.execute("SELECT 1 FROM discovery_shops WHERE shop_id=61104361").fetchone())
 
+    # A temporary 503 must retain the queue item; a 404 should remove and record the unavailable seller.
     def test_missing_shop_does_not_block_queue(self):
         from requests import Response
         from requests.exceptions import HTTPError
