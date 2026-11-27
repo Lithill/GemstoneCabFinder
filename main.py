@@ -34,6 +34,7 @@ def load_favourited_shops(filename="data/favourited_shops.txt"):
         print("Exclusion file not found. Continuing without exclusions.")
         return set()
 
+# Read exclusions from the original seller database, separate from the dashboard database.
 def load_favourite_shops():
     """Load favourite Etsy shop names from the database."""
     with sqlite3.connect("data/gemstone_sellers.db") as connection:
@@ -43,6 +44,7 @@ def load_favourite_shops():
 
     return {row[0].casefold() for row in rows}
 
+# Match configured gemstone names at word boundaries, ignoring case.
 def contains_listed_gemstone(title):
     title = title.casefold()
 
@@ -51,6 +53,7 @@ def contains_listed_gemstone(title):
         for gemstone in GEMSTONES
     )
 
+# Load previously qualified shops so the search can skip their IDs.
 def load_saved_shops():
     connection = sqlite3.connect("data/gemstone_sellers.db")
 
@@ -74,6 +77,7 @@ def load_saved_shops():
         for row in rows
     ]
 
+# Calculate shop age in UTC and insert or update the original database record.
 def save_shop_to_database(shop):
 
     created_timestamp = shop.get("create_date")
@@ -115,6 +119,7 @@ def save_shop_to_database(shop):
     connection.commit()
     connection.close()
 
+# Turn HTTPS shop and evidence URLs into Excel hyperlinks.
 def make_urls_clickable(worksheet):
     """Make Etsy URLs clickable in an Excel worksheet."""
 
@@ -136,6 +141,7 @@ def make_urls_clickable(worksheet):
                     underline="single",
                 )
 
+# Maintain the legacy spreadsheet and history of shops already offered for review.
 def update_review_list(new_shops, unknown_shipping_shops, output_file):
     """Add newly qualified shops without restoring manually deleted shops."""
 
@@ -270,6 +276,7 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
     else:
         unknown_df = pd.DataFrame()
 
+    # Keep shops with unknown shipping origin in a separate worksheet.
     unknown_columns = [
         "Shop Name",
         "Shop ID",
@@ -343,6 +350,7 @@ def update_review_list(new_shops, unknown_shipping_shops, output_file):
     print("New shops added to review list:", len(new_rows))
     print("Total shops remaining in review list:", len(updated_df))
 
+# Retry connection failures and timeouts up to three times; stop on HTTP 429.
 def get_etsy_with_retries(url, headers, params=None):
     """Retry temporary Etsy timeouts and stop on rate limits."""
 
@@ -370,6 +378,7 @@ def get_etsy_with_retries(url, headers, params=None):
     print("  Etsy did not respond after 3 attempts.")
     return None
 
+# Legacy command-line entry point; the current dashboard uses separate discovery and refresh modules.
 def main():
     """Run the Etsy gemstone cabochon seller search."""
 
@@ -379,6 +388,7 @@ def main():
     print("Minimum rating:", MIN_SHOP_RATING)
     print("Minimum reviews:", MIN_SHOP_REVIEWS)
 
+    # Load API credentials from environment configuration rather than embedding them in source.
     load_dotenv()
 
     api_key = os.getenv("ETSY_API_KEY")
@@ -415,6 +425,7 @@ def main():
         seen_search_shop_ids = set()
         batch_size = 100
 
+        # Search each configured term in pages of up to 100 listings.
         for search_term in SEARCH_TERMS:
             print(f"\nSearching Etsy for: {search_term}")
 
@@ -429,6 +440,7 @@ def main():
             for offset in range(0, MAX_LISTINGS_TO_SEARCH, batch_size):
                 search_params["offset"] = offset
 
+                # This marketplace search uses a direct request, unlike the retry helper used for shop details.
                 response = requests.get(
                     search_url,
                     headers=headers,
@@ -449,6 +461,7 @@ def main():
 
                 new_listings = 0
 
+                # Deduplicate listings across overlapping search terms using their Etsy IDs.
                 for listing in batch_listings:
                     listing_id = listing.get("listing_id")
 
@@ -515,6 +528,7 @@ def main():
             # Collect WYSIWYG evidence for each shop
             shop_wysiwyg_evidence = {}
 
+            # Use the shared evidence ranking to retain the strongest listing evidence for each seller.
             wysiwyg_priority = EVIDENCE_RANK
 
             for listing in listings:
@@ -560,6 +574,7 @@ def main():
             qualifying_shops = []
 
             # Check only newly discovered shops not already saved
+            # Exclude previously saved shop IDs before requesting shop details.
             shops_to_check = unique_shop_ids - set(saved_shops_by_id)
 
             print("New shops to check:", len(shops_to_check))
@@ -601,6 +616,7 @@ def main():
                     print(f"\nSkipping excluded shop: {shop_name}")
                     continue
 
+                # Missing review information cannot satisfy the eligibility checks.
                 if rating is None or reviews is None:
                     print("Result: EXCLUDED - missing review information")
                     continue
@@ -622,6 +638,7 @@ def main():
                     datetime.now(timezone.utc) - created_date
                 ).days
 
+                # Apply minimum rating, review count and age together.
                 if (
                     rating >= MIN_SHOP_RATING
                     and reviews >= MIN_SHOP_REVIEWS
@@ -648,6 +665,7 @@ def main():
             final_shops = []
             unknown_shipping_shops = []
 
+            # Separate allowed shipping origins from unknown origins; other countries are excluded.
             for shop in qualifying_shops:
                 shipping_country = shop.get("shipping_from_country_iso")
 
@@ -674,6 +692,7 @@ def main():
 
                 shop_listing_count = 0
 
+                # Optional inventory scan; a configured limit of zero disables these requests.
                 for offset in range(0, MAX_SHOP_LISTINGS_TO_SEARCH, 100):
                     shop_response = requests.get(
                         shop_listings_url,
@@ -743,6 +762,7 @@ def main():
                 print("Qualified:", shop.get("shop_name"))
 
             # Update the permanent Excel shop review list
+            # Legacy Windows spreadsheet destination; this is not the dashboard's storage path.
             output_file = r"G:\My Drive\GemstoneCabFinder\gemstone_sellers_test.xlsx"
 
             update_review_list(
@@ -768,5 +788,6 @@ def main():
     except requests.RequestException as error:
         print("Search error:", error)
 
+# Run the search only when invoked as a script.
 if __name__ == "__main__":
     main()
