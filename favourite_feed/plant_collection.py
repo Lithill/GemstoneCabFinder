@@ -1,5 +1,6 @@
 """Care advice for the initial houseplant collection."""
 
+# Each plant's tuple contains moisture-check advice, possible warning signs and general growing conditions, in that order.
 INITIAL_CARE = {
     "Money tree": ("Let the top 3–5 cm of compost dry; check the pot feels lighter before watering.", "Yellow soft leaves or a soft trunk can mean wet roots; crispy curling leaves with dry compost can mean thirst.", "Bright indirect light, a draining pot and no standing water; rotate for even growth."),
     "Button fern": ("Check just beneath the surface; water when the top starts to feel slightly dry, not when the whole pot is bone dry.", "Crispy leaflets suggest dryness or low humidity; yellow fronds and sour wet compost suggest excess water.", "Indirect light, moderate humidity and evenly lightly moist, airy compost."),
@@ -20,4 +21,5 @@ INITIAL_CARE = {
     "Cape sundew": ("Keep the pot standing in a shallow tray of rainwater, distilled or reverse-osmosis water; its medium should remain consistently wet.", "Loss of sticky dew can indicate insufficient light or stress; brown growth may result from mineral-rich tap water or drying out.", "Strong light, nutrient-poor carnivorous-plant compost and mineral-free water; never fertilise the soil."),
 }
 
+# Names used when seeding a new collection for the first time; existing collections are not reset by this list.
 INITIAL_PLANTS = ["Money tree","Button fern","Christmas cactus","Fishbone cactus","Golden pothos","Grape ivy","Jade plant","Kimberley queen fern","Lipstick plant","Mother-in-law's tongue","Oxalis triangularis","Parlour palm","Porcelain plant (Hoya)","Rattlesnake plant","Silver inch plant","String of hearts","Cape sundew"]
