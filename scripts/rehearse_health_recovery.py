@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from favourite_feed import health_diary_bridge, health_vault
 
 
+# Fixed fictional test data, not records from the personal diary.
 DAY = "2026-11-21"
 FICTIONAL_DIARY = [
     {"name": "Hot flushes", "answer": "Yes", "extras": [], "notes": "do not retain"},
@@ -29,30 +30,36 @@ FICTIONAL_DIARY = [
 
 def rehearse() -> dict:
     """Return non-sensitive checks; fail loudly on any recovery discrepancy."""
+    # Isolate every test file in a temporary directory that is cleaned up when the context exits.
     with tempfile.TemporaryDirectory(prefix="synthetic-health-recovery-") as temp:
         root = Path(temp)
         original = root / "fictional-original.db"
         encrypted = root / "fictional-backup.enc"
         restored = root / "fictional-restored.db"
+        # Generate a disposable key and temporarily override the environment for this rehearsal only.
         key = Fernet.generate_key().decode("ascii")
         with patch.dict(os.environ, {"HEALTH_VAULT_KEY": key}):
             health_vault.provision(original)
             count = health_diary_bridge.save_diary_offline(DAY, FICTIONAL_DIARY, path=original)
             if count != len(FICTIONAL_DIARY):
                 raise AssertionError("Initial synthetic check-in count mismatch.")
+            # Read back the saved fictional entries to establish the expected recovery result and confirm notes are omitted.
             expected = health_diary_bridge.read_diary_offline(DAY, path=original)
             if any(item["notes"] for item in expected):
                 raise AssertionError("Notes unexpectedly persisted.")
+            # Create an encrypted snapshot and verify that all synthetic entries authenticate.
             health_vault.encrypted_backup(encrypted, path=original)
             verified_count = health_vault.verify_backup(encrypted)
             if verified_count != count:
                 raise AssertionError("Encrypted backup did not verify every entry.")
+            # Check that these particular sample strings do not appear directly in the backup bytes; authentication checks provide the stronger integrity test.
             if b"Brain fog" in encrypted.read_bytes() or b"do not retain" in encrypted.read_bytes():
                 raise AssertionError("Backup contains unencrypted synthetic answers.")
             # Simulate total loss of the working vault, without touching anything else.
             original.unlink()
             if original.exists():
                 raise AssertionError("Failed to simulate vault loss.")
+            # Restore the verified backup to a different path and compare the recovered answers with the expected values.
             health_vault.restore_backup(encrypted, restored)
             recovered = health_diary_bridge.read_diary_offline(DAY, path=restored)
             if recovered != expected:
@@ -85,6 +92,7 @@ def rehearse() -> dict:
                 pass
             else:
                 raise AssertionError("Restore overwrote an existing vault.")
+            # Return only non-sensitive counts and test outcomes, not the encryption key or diary contents.
             return {
                 "synthetic_entries": count,
                 "authenticated_backup_entries": verified_count,
