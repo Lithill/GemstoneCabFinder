@@ -8,6 +8,7 @@ from favourite_feed.health_vault import provision, put, get, restore_backup
 from scripts.health_daily_backup import rotate
 
 class DailyBackupTests(unittest.TestCase):
+    # Simulate nine daily backups, verify seven remain, restore the latest answer and check private permissions.
     def test_rotation_and_recovery(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict("os.environ", {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
             root = Path(tmp)
@@ -27,6 +28,7 @@ class DailyBackupTests(unittest.TestCase):
             self.assertEqual(latest.stat().st_mode & 0o777, 0o600)
             self.assertEqual(folder.stat().st_mode & 0o777, 0o700)
 
+    # Refresh the same day's backup and simulate a failed replacement to ensure the last successful backup survives.
     def test_refresh_and_failed_replacement(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict("os.environ", {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
             root = Path(tmp)
