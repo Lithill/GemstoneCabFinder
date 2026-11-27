@@ -1,7 +1,6 @@
 from datetime import timedelta
 from statistics import mean
-from favourite_feed.health_impact import SCORES
-from favourite_feed.health_answers import QUESTIONS
+from favourite_feed.health_summary import severity_score, count_bleeding, count_exercise
 
 
 def review(today, days, items, read_day, read_exercise):
@@ -17,19 +16,12 @@ def review(today, days, items, read_day, read_exercise):
             counts["diary_days"] += bool(entries)
             for e in entries:
                 name, value = e["name"], e["answer"]
-                if QUESTIONS.get(name) in ("severity","sleep") and value in SCORES:
-                    ratings.setdefault(name, []).append(SCORES[value])
-                if name == "Period / bleeding today":
-                    key = {"Period":"period","Spotting":"spotting","Unexpected":"unexpected","None":"no_bleeding"}.get(value)
-                    if key:
-                        counts[key] += 1
+                score = severity_score(name, value)
+                if score is not None:
+                    ratings.setdefault(name, []).append(score)
+                count_bleeding(counts, name, value)
             log = read_exercise(day)
-            if log:
-                if log["rest"]:
-                    counts["rest"] += 1
-                elif log["sessions"]:
-                    counts["active"] += 1
-                    counts["minutes"] += sum(s["minutes"] for s in log["sessions"])
+            count_exercise(counts, log)
         changes = sorted([dict(e,name=item["name"]) for item in items for e in item["history"]
                           if start.isoformat() <= e["day"] <= end.isoformat()],key=lambda e:e["day"])
         periods.append(dict(start=start.isoformat(),end=end.isoformat(),counts=counts,changes=changes,ratings=ratings))
