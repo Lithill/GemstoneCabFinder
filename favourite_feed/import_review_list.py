@@ -1,6 +1,7 @@
 from favourite_feed.database import connect_database, setup_database
 from favourite_feed.discovery import setup
 
+# Historical review-list snapshot: each row contains shop ID, name, country, rating and review count.
 ROWS = """60611701 MpGemsIndia IN 4.9 81
 61104361 InfinityCabochons IN 4.94 123
 61308999 UniqueAlfizaGems IN 4.59 26
@@ -82,11 +83,13 @@ ROWS = """60611701 MpGemsIndia IN 4.9 81
 60182538 KHADIJAGEMSJEWELRY IN 4.97 49
 60329323 DRUZYGEMSDesign IN 4.73 671"""
 
+# Import the historical snapshot into dashboard discovery storage without live Etsy requests.
 def main():
     setup_database()
     added=0
     with connect_database() as conn:
         setup(conn)
+        # Parse each row and insert only if not already present or monitored by ID or name.
         for line in ROWS.splitlines():
             sid,name,country,rating,reviews=line.split()
             result=conn.execute("""INSERT OR IGNORE INTO discovery_shops
@@ -95,6 +98,7 @@ def main():
                 WHERE NOT EXISTS (SELECT 1 FROM monitored_shops WHERE shop_id=? OR lower(shop_name)=lower(?))""",
                 (int(sid),name,country,float(rating),int(reviews),int(sid),name))
             added+=result.rowcount
+        # Count pending discovery shops that are not already monitored.
         pending=conn.execute("SELECT COUNT(*) FROM discovery_shops d WHERE status='pending' AND NOT EXISTS (SELECT 1 FROM monitored_shops m WHERE m.shop_id=d.shop_id)").fetchone()[0]
     print(f"Imported {added} shops; {pending} shops awaiting review.")
 
