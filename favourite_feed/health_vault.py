@@ -134,17 +134,33 @@ def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> Non
             (_entry_id(day, question), payload))
 
 
-def get(day: str, question: str, path: Path = DEFAULT_PATH) -> dict | None:
+def get_many(day: str, questions, path: Path = DEFAULT_PATH) -> dict:
+    """Read requested identities in one verified connection; never scan unrelated records."""
+    identities = {_entry_id(day, question): question for question in questions}
+    answers = {}
+    cipher = Fernet(_key())
     with closing(_connect(path)) as conn, conn:
         _verified(conn)
-        row = conn.execute("SELECT encrypted_payload FROM entries WHERE entry_id=?", (_entry_id(day, question),)).fetchone()
-    if not row:
-        return None
-    record = json.loads(Fernet(_key()).decrypt(row[0]))
-    if record.get("day") != day or record.get("question") != question:
-        raise RuntimeError("Health entry identity mismatch.")
-    return record["answer"]
+        # Stay below SQLite's older parameter limit.
+        ids = list(identities)
+        for offset in range(0, len(ids), 500):
+            batch = ids[offset:offset + 500]
+            placeholders = ",".join("?" for _ in batch)
+            rows = conn.execute(
+                f"SELECT entry_id, encrypted_payload FROM entries WHERE entry_id IN ({placeholders})",
+                batch,
+            )
+            for entry_id, payload in rows:
+                question = identities[entry_id]
+                record = json.loads(cipher.decrypt(payload))
+                if record.get("day") != day or record.get("question") != question:
+                    raise RuntimeError("Health entry identity mismatch.")
+                answers[question] = record["answer"]
+    return answers
 
+
+def get(day: str, question: str, path: Path = DEFAULT_PATH) -> dict | None:
+    return get_many(day, [question], path).get(question)
 
 
 def delete(day: str, question: str, path: Path = DEFAULT_PATH) -> bool:
