@@ -3,7 +3,7 @@
 // Define question categories and input types; names and answer formats must agree with the server's validation rules.
 const groups = [
   {name:"Daily questions",items:[
-    ["Hot flushes","yesno"],["Night sweats","yesno"]
+    ["Hot flushes","yesno"],["Night sweats","yesno"],["Did you drink alcohol yesterday?","yesno"]
   ]},
   {name:"Periods and bleeding",items:[
     ["Period / bleeding today","period"],["Period start or end date","date"],["Cycle changes or irregular periods","severity"],["Heavy bleeding or flooding","severity"]
@@ -62,7 +62,7 @@ function field(parent,label,type,options){
 function fields(parent,q){
   parent.replaceChildren();
   const inputs={};
-  if(q.type==="yesno") inputs.answer=field(parent,"Today",null,[["","Not answered"],["Yes","Yes"],["No","No"]]);
+  if(q.type==="yesno") inputs.answer=field(parent,q.name==="Did you drink alcohol yesterday?"?"Day before selected diary date":"Today",null,[["","Not answered"],["Yes","Yes"],["No","No"]]);
   else if(q.type==="period"){
     inputs.answer=field(parent,"Bleeding today",null,[["","Not recorded"],["None","None"],["Period","Period"],["Spotting","Spotting"],["Unexpected","Unexpected bleeding"]]);
     inputs.flow=field(parent,"Flow",null,[["","Not recorded"],["Light","Light"],["Medium","Medium"],["Heavy","Heavy"],["Flooding","Flooding"]]);
@@ -75,7 +75,7 @@ function fields(parent,q){
   }else if(q.type==="libido"){
     inputs.answer=field(parent,"Sex drive",null,[["","Not recorded"],["Low","Low / absent"],["Usual","Usual for me"],["Higher","Higher than usual"],["Fluctuating","Fluctuating"]]);
   }else if(q.type==="uti"){
-    inputs.answer=field(parent,"UTI status",null,[["","Not recorded"],["Suspected","Suspected"],["Confirmed","Confirmed"],["Symptoms","Urinary symptoms"],["Resolved","Resolved"]]);
+    inputs.answer=field(parent,"UTI status",null,[["","Not recorded"],["None","None"],["Suspected","Suspected"],["Confirmed","Confirmed"],["Symptoms","Urinary symptoms"],["Resolved","Resolved"]]);
     inputs.detail=field(parent,"Treatment or symptoms (optional)","text");
   }else if(q.type==="sleep"){
     inputs.answer=field(parent,"Difficulty",null,[["","Not recorded"],["None","None"],["Mild","Mild"],["Moderate","Moderate"],["Severe","Severe"]]);
