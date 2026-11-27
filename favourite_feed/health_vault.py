@@ -16,6 +16,7 @@ import sqlite3
 
 from cryptography.fernet import Fernet, InvalidToken
 
+# Default private vault location outside the project; the web configuration can select a different vault.
 DEFAULT_PATH = Path.home() / ".gemstonecabfinder-private" / "health_vault.db"
 
 
@@ -28,6 +29,7 @@ def password_hash(password: str, *, salt: bytes | None = None) -> str:
     return "scrypt$32768$8$1$" + base64.urlsafe_b64encode(salt).decode() + "$" + base64.urlsafe_b64encode(digest).decode()
 
 
+# Recalculate the password verifier using the saved salt and fixed scrypt settings; never store the original password.
 def verify_password(password: str, encoded: str) -> bool:
     try:
         scheme, n, r, p, salt, expected = encoded.split("$")
@@ -39,6 +41,7 @@ def verify_password(password: str, encoded: str) -> bool:
         return False
 
 
+# Read and validate the encryption key from the environment. Losing the key prevents recovery of encrypted records.
 def _key() -> bytes:
     key = os.environ.get("HEALTH_VAULT_KEY", "")
     if not key:
@@ -50,6 +53,7 @@ def _key() -> bytes:
     return key.encode("ascii")
 
 
+# Open an existing regular vault file only; do not silently create an empty database.
 def _connect(path: Path):
     path = Path(path).expanduser()
     if not path.exists():
@@ -59,6 +63,7 @@ def _connect(path: Path):
     return sqlite3.connect(path)
 
 
+# Explicitly create a new vault with private permissions and a test value encrypted using its key.
 def provision(path: Path = DEFAULT_PATH) -> None:
     """Explicit offline setup only; never called by the web app."""
     _key()
@@ -109,6 +114,7 @@ def _entry_id(day: str, question: str) -> str:
     return hmac.new(_key(), json.dumps([day, question], separators=(",", ":"), ensure_ascii=False).encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+# Serialise a single record, including its date and question, then encrypt it before writing to SQLite.
 def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> None:
     """Offline API only. Not connected to web routes or the prototype."""
     from datetime import date
@@ -125,6 +131,7 @@ def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> Non
         raise ValueError("Answer must contain valid JSON data.") from exc
     if len(serialized) > 16 * 1024:
         raise ValueError("Health entry exceeds the 16 KiB size limit.")
+    # Fernet provides authenticated encryption, protecting content and detecting unauthorised modifications.
     payload = Fernet(_key()).encrypt(serialized)
     with closing(_connect(path)) as conn, conn:
         _verified(conn)
@@ -136,8 +143,10 @@ def put(day: str, question: str, answer: dict, path: Path = DEFAULT_PATH) -> Non
 
 def get_many(day: str, questions, path: Path = DEFAULT_PATH) -> dict:
     """Read requested identities in one verified connection; never scan unrelated records."""
+    # Calculate secret lookup IDs only for requested questions, avoiding a scan of the entire diary.
     identities = {_entry_id(day, question): question for question in questions}
     answers = {}
+    # Reuse the cipher and verified database connection for the batch of requested answers.
     cipher = Fernet(_key())
     with closing(_connect(path)) as conn, conn:
         _verified(conn)
@@ -153,16 +162,19 @@ def get_many(day: str, questions, path: Path = DEFAULT_PATH) -> dict:
             for entry_id, payload in rows:
                 question = identities[entry_id]
                 record = json.loads(cipher.decrypt(payload))
+                # Confirm that the decrypted date and question match the requested identity, detecting misplaced records.
                 if record.get("day") != day or record.get("question") != question:
                     raise RuntimeError("Health entry identity mismatch.")
                 answers[question] = record["answer"]
     return answers
 
 
+# Single-answer convenience wrapper around the bulk reading function.
 def get(day: str, question: str, path: Path = DEFAULT_PATH) -> dict | None:
     return get_many(day, [question], path).get(question)
 
 
+# Remove the record for one date and question; this does not erase copies in older backups.
 def delete(day: str, question: str, path: Path = DEFAULT_PATH) -> bool:
     """Offline-only deletion of one encrypted answer; never exposed as a web route."""
     from datetime import date
@@ -179,6 +191,7 @@ def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
     destination = Path(destination).expanduser()
     if destination.exists() or destination.is_symlink():
         raise FileExistsError("Refusing to overwrite backup.")
+    # Copy the encrypted-record database into memory and verify it before encrypting the entire snapshot.
     with closing(_connect(path)) as source:
         _verified(source)
         snapshot = sqlite3.connect(":memory:")
@@ -190,11 +203,13 @@ def encrypted_backup(destination: Path, path: Path = DEFAULT_PATH) -> None:
             raw = snapshot.serialize()
         finally:
             snapshot.close()
+    # Encrypt the whole SQLite snapshot as an additional layer of protection for the backup.
     encrypted = Fernet(_key()).encrypt(raw)
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(destination.parent, 0o700)
     fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
+        # Flush the output and request a disk sync before treating the file as successfully written.
         with os.fdopen(fd, "wb") as output:
             output.write(encrypted)
             output.flush()
@@ -256,6 +271,7 @@ def verify_backup(source: Path) -> int:
         check.close()
 
 
+# Verify the backup in memory and write a new vault file without overwriting an existing one.
 def restore_backup(source: Path, destination: Path) -> None:
     """Offline restore to a NEW file only. Verify backup and key before writing."""
     source, destination = Path(source).expanduser(), Path(destination).expanduser()
