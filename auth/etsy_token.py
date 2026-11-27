@@ -3,6 +3,7 @@ import json
 import requests
 from dotenv import load_dotenv
 
+# Load the client API key from environment configuration.
 load_dotenv()
 
 API_KEY = os.getenv("ETSY_API_KEY")
@@ -17,6 +18,7 @@ with open("etsy_oauth_state.json", "r") as file:
     saved_security = json.load(file)
 
 # Exchange the code for an Etsy access token
+# Exchange the temporary code and original PKCE verifier using the matching redirect URI.
 response = requests.post(
     "https://api.etsy.com/v3/public/oauth/token",
     data={
@@ -32,6 +34,7 @@ response = requests.post(
 if response.status_code == 200:
     token_data = response.json()
 
+    # Save the returned tokens locally; this file contains credentials and must be kept private.
     with open("etsy_tokens.json", "w") as file:
         json.dump(token_data, file)
 
