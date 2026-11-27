@@ -8,6 +8,7 @@ from favourite_feed.database import connect_database
 from favourite_feed.gemstone_quiz import GEMS, canonical_name, clean_label, material_info, display_answer, material_category, visual_alternatives, identify as identify_quiz_gem, options as quiz_options
 from favourite_feed.gemstone_identification_tips import TIPS as GEMSTONE_TIPS
 
+# Remember up to eight session orders; hashing the seed and listing ID gives a repeatable shuffled order.
 @lru_cache(maxsize=8)
 def _quiz_order(seed, ids):
     return tuple(sorted(ids, key=lambda i: hashlib.sha256(
@@ -20,6 +21,7 @@ def gemstone_quiz():
         position = max(0, int(request.args.get("position", "0")))
     except (TypeError, ValueError):
         position = 0
+    # A seed identifies a quiz round so Previous and Next retain the same order.
     seed = request.args.get("seed", "")
     if not (len(seed) == 16 and all(c in "0123456789abcdef" for c in seed)):
         seed = secrets.token_hex(8)
@@ -44,7 +46,9 @@ def gemstone_quiz():
             conn.executemany("INSERT OR IGNORE INTO quiz_label_cleanup_backup VALUES (?, ?)", [(i, old) for _, i, old in repairs] + unresolved)
             conn.executemany("UPDATE quiz_labels SET name=? WHERE listing_id=? AND name=?", repairs)
             conn.executemany("DELETE FROM quiz_labels WHERE listing_id=? AND name=?", unresolved)
+        # Include manually supplied gemstone names alongside the built-in dictionary.
         custom = {name for name in labels.values() if name}
+        # Use only seen listings with at least one usable photograph, choosing the first ranked image.
         rows = conn.execute("""
             SELECT l.listing_id, l.title, l.listing_url,
                    (SELECT image_url FROM listing_images i
@@ -57,10 +61,12 @@ def gemstone_quiz():
             ORDER BY l.published_at DESC, l.listing_id DESC
         """).fetchall()
         conn.execute("CREATE TABLE IF NOT EXISTS quiz_learning (name TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0, confident INTEGER NOT NULL DEFAULT 0, needs INTEGER NOT NULL DEFAULT 0)")
+        # Read confidence and practice counts for each gemstone name.
         learning = {row[0]: (row[1], row[2], row[3]) for row in conn.execute("SELECT name, attempts, confident, needs FROM quiz_learning")}
     # Only quiz titles with one recognised gemstone; do not guess from photos.
     custom = tuple(sorted(custom))
     eligible = [(row, labels[row["listing_id"]] if row["listing_id"] in labels else identify_quiz_gem(row["title"], custom)) for row in rows]
+    # Send unidentified listings without a manual label to the review queue; blank saved labels mean skip.
     review = [row for row, gem in eligible if not gem and row["listing_id"] not in labels]
     rows = [(row, gem) for row, gem in eligible if gem]
     # A fresh random order per quiz, stable while navigating Previous/Next.
@@ -79,19 +85,23 @@ def gemstone_quiz():
         excluded = original - set(prior)
     else:
         excluded = {canonical_name(name) for name in prior.get("excluded", [])}
+    # Exclude only the names disabled in quiz settings.
     enabled = known - excluded
     rows = [(row, gem) for row, gem in rows if gem in enabled]
     mode = request.args.get("mode", "all")
     if mode in {"natural", "organic", "manufactured", "uncertain"}:
         rows = [(row, gem) for row, gem in rows if material_category(gem) == mode]
+    # Practice mode selects names with more needs-practice ratings than confident ratings.
     elif mode == "practice":
         rows = [(row, gem) for row, gem in rows if learning.get(gem, (0, 0, 0))[2] > learning.get(gem, (0, 0, 0))[1]]
     elif mode == "adaptive":
         # Keep ordering stable during a session; prioritize weak material on a fresh round.
         rows = _adaptive_rows(seed, rows, learning)
+    # Keep the question position within the available list, including an empty quiz.
     total = len(rows)
     position = min(position, max(0, total - 1))
     item, answer = rows[position] if total else (None, None)
+    # Allow a requested practice example of a particular gemstone when one is available.
     followup = request.args.get("practice", "")
     example = next(((row, gem) for row, gem in rows if gem == followup), None)
     if example:
@@ -110,6 +120,7 @@ def gemstone_quiz():
 
 # Bounded session ordering cache; ratings affect the next fresh round.
 _adaptive_orders = {}
+# Rank weaker materials first on a fresh round, retaining that order during navigation.
 def _adaptive_rows(seed, rows, learning):
     key = (seed, tuple(row["listing_id"] for row, _ in rows))
     order = _adaptive_orders.get(key)
@@ -123,6 +134,7 @@ def _adaptive_rows(seed, rows, learning):
     return [by_id[i] for i in order]
 
 
+# Validate a submitted confidence rating and increment the corresponding learning counters.
 def gemstone_quiz_learning():
     data = request.get_json(silent=True) or {}
     name = data.get("name")
@@ -136,6 +148,7 @@ def gemstone_quiz_learning():
     return jsonify(ok=True)
 
 
+# Save a corrected name or blank skip marker for a seen listing.
 def gemstone_quiz_questionable(listing_id):
     name = " ".join(request.form.get("name", "").split())
     if len(name) > 100:
@@ -148,6 +161,7 @@ def gemstone_quiz_questionable(listing_id):
     return redirect(url_for("gemstone_quiz"))
 
 
+# Build searchable reference entries from known names, tips and saved listing photos.
 def gemstone_library():
     query = request.args.get("q", "").strip().casefold()
     with connect_database() as conn:
@@ -160,12 +174,14 @@ def gemstone_library():
         if photo:
             name = labels.get(listing_id) if listing_id in labels else identify_quiz_gem(title, custom)
             if name:
+                # Keep the first available photo for each name; the query orders newer listings first.
                 photos.setdefault(name, photo)
     names = sorted(set(GEMS) | set(custom))
     entries = [(name, material_info(name), photos.get(name), GEMSTONE_TIPS.get(name, ""), list(dict.fromkeys(GEMS.get(name, ([], []))[1] + visual_alternatives(name)))[:5]) for name in names if not query or query in (name + " " + display_answer(name)).casefold()]
     return render_template("gemstone_library.html", entries=entries, query=query, display_answer=display_answer)
 
 
+# Save excluded names while preserving settings for names not shown in the submitted form.
 def gemstone_quiz_settings():
     displayed = set(request.form.getlist("displayed"))
     selected = set(request.form.getlist("gem"))
@@ -179,6 +195,7 @@ def gemstone_quiz_settings():
     return redirect(url_for("gemstone_quiz"))
 
 
+# Validate and save up to ten manual review decisions together.
 def gemstone_quiz_labels():
     ids = request.form.getlist("listing_id")
     if len(ids) > 10 or len(set(ids)) != len(ids) or any(not i.isascii() or not i.isdigit() or len(i) > 18 for i in ids):
@@ -204,6 +221,7 @@ def gemstone_quiz_labels():
     return redirect(url_for("gemstone_quiz", review=1) + "#review")
 
 
+# Save a single reviewed listing, reusing existing name capitalisation when possible.
 def gemstone_quiz_label(listing_id):
     name = " ".join(request.form.get("name", "").split())
     if len(name) > 100:
@@ -221,6 +239,7 @@ def gemstone_quiz_label(listing_id):
 
 
 
+# Connect quiz and library URLs to their page and form-handling functions.
 def register_quiz_routes(app):
     app.get("/gemstone-quiz")(gemstone_quiz)
     app.post("/gemstone-quiz/learning")(gemstone_quiz_learning)
