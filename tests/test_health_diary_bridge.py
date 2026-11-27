@@ -84,6 +84,31 @@ class DiaryBridgeTests(unittest.TestCase):
             bridge.save_diary_offline("2026-11-21", [], path=Path(self.temp.name) / "missing.db")
         self.assertEqual(bridge.save_diary_offline("2026-11-21", [], path=self.db), 0)
 
+    def test_bulk_read_uses_one_connection_and_preserves_missing_answers(self):
+        day = "2026-11-21"
+        bridge.save_diary_offline(day, [item("Brain fog", "Mild")], path=self.db)
+        bridge.save_diary_offline("2026-11-22", [item("Hot flushes", "Yes")], path=self.db)
+        with patch.object(health_vault, "_connect", wraps=health_vault._connect) as connect:
+            self.assertEqual(bridge.read_diary_offline(day, path=self.db),
+                             [item("Brain fog", "Mild")])
+            self.assertEqual(connect.call_count, 1)
+
+    def test_bulk_read_rejects_invalid_stored_answer(self):
+        day = "2026-11-21"
+        health_vault.put(day, "Brain fog", {"answer": "Invalid"}, self.db)
+        with self.assertRaises(ValueError):
+            bridge.read_diary_offline(day, path=self.db)
+
+    def test_bulk_read_rejects_swapped_encrypted_payload(self):
+        import sqlite3
+        from contextlib import closing
+        day = "2026-11-21"
+        bridge.save_diary_offline(day, [item("Brain fog", "Mild")], path=self.db)
+        with closing(sqlite3.connect(self.db)) as conn, conn:
+            conn.execute("UPDATE entries SET entry_id=?", (health_vault._entry_id(day, "Hot flushes"),))
+        with self.assertRaises(RuntimeError):
+            bridge.read_diary_offline(day, path=self.db)
+
 
 if __name__ == "__main__":
     unittest.main()
