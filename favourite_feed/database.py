@@ -2,22 +2,28 @@ import sqlite3
 from contextlib import contextmanager, closing
 from pathlib import Path
 
+# Resolve the project directory from this file rather than relying on the current working directory.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = PROJECT_ROOT / "data" / "favourite_feed.db"
 
 
+# Provide a reusable database connection that commits successful work, rolls back errors and closes afterwards.
 @contextmanager
 def connect_database():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(DB_PATH)) as conn:
+        # Allow database rows to be accessed by column name, for example row["title"].
         conn.row_factory = sqlite3.Row
+        # Enforce relationships between tables, such as a listing belonging to an existing shop.
         conn.execute("PRAGMA foreign_keys = ON")
         with conn:
             yield conn
 
 
+# Create missing gemstone tables and indexes without replacing existing records.
 def setup_database():
     with connect_database() as conn:
+        # Run the SQL schema: shops, imported name mappings, listings and their photos. Indexes help common searches.
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS monitored_shops (
                 shop_id INTEGER PRIMARY KEY,
