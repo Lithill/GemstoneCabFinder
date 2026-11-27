@@ -16,6 +16,7 @@ from favourite_feed import health_vault
 
 
 class HealthVaultTests(unittest.TestCase):
+    # Generate a fresh encryption key and temporary vault for each test; restore environment and remove files afterward.
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -26,6 +27,7 @@ class HealthVaultTests(unittest.TestCase):
         self.db = Path(self.tmp.name) / "vault.db"
         health_vault.provision(self.db)
 
+    # Track real SQLite connections to ensure reads, writes, backups and deletes release resources.
     def test_vault_operations_close_sqlite_connections(self):
         original_connect = health_vault._connect
         opened = []
@@ -63,6 +65,7 @@ class HealthVaultTests(unittest.TestCase):
         self.assertEqual(len(opened), 4)
         self.assertTrue(all(connection.closed for connection in opened))
 
+    # Construct intentionally invalid encrypted fixtures to exercise verification independently of normal backup creation.
     def _synthetic_unverified_backup(self, destination):
         """Create deliberately damaged test fixtures without using production backup."""
         with closing(sqlite3.connect(self.db)) as source, source:
@@ -73,6 +76,7 @@ class HealthVaultTests(unittest.TestCase):
             finally:
                 snapshot.close()
 
+    # Check that updating one day/question preserves other days and that sample plaintext is absent from the stored database.
     def test_upsert_replaces_same_day_question_only(self):
         health_vault.put("2026-11-20", "Anxiety", {"answer": "Mild"}, self.db)
         health_vault.put("2026-11-20", "Anxiety", {"answer": "Severe"}, self.db)
@@ -88,6 +92,7 @@ class HealthVaultTests(unittest.TestCase):
         self.assertNotIn(b"2026-11-20", raw)
         self.assertNotIn(b"Severe", raw)
 
+    # Reject unsupported JSON values and oversized payloads without saving an entry.
     def test_put_rejects_non_json_nan_and_oversized_answers(self):
         invalid = [
             {"answer": object()},
@@ -102,6 +107,7 @@ class HealthVaultTests(unittest.TestCase):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
 
+    # Delete exactly one record, leaving other questions and dates intact.
     def test_delete_only_targeted_day_and_question(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         health_vault.put("2026-11-20", "Anxiety", {"answer": "Severe"}, self.db)
@@ -112,6 +118,7 @@ class HealthVaultTests(unittest.TestCase):
         self.assertEqual(health_vault.get("2026-11-20", "Anxiety", self.db), {"answer": "Severe"})
         self.assertEqual(health_vault.get("2026-11-21", "Sleep", self.db), {"answer": "None"})
 
+    # Reject deletion with a wrong key or invalid date and preserve the original answer.
     def test_delete_wrong_key_and_invalid_day_fail_closed(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         with patch.dict(os.environ, {"HEALTH_VAULT_KEY": Fernet.generate_key().decode()}):
@@ -121,6 +128,7 @@ class HealthVaultTests(unittest.TestCase):
             health_vault.delete("not-a-day", "Sleep", self.db)
         self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
 
+    # Restore an encrypted backup to a new file, reject overwrites and reject an unrelated key.
     def test_backup_restore_and_wrong_key(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Moderate"}, self.db)
         backup = Path(self.tmp.name) / "backup.enc"
@@ -135,6 +143,7 @@ class HealthVaultTests(unittest.TestCase):
             with self.assertRaises(InvalidToken):
                 health_vault.restore_backup(backup, Path(self.tmp.name) / "wrong.db")
 
+    # Even correctly encrypted records must pass payload validation before backup or restore.
     def test_backup_rejects_authenticated_oversized_or_nan_entry(self):
         day, question = "2026-11-20", "Sleep"
         for raw_answer in ['{"notes":"' + "x" * (16 * 1024) + '"}', '{"value":NaN}']:
@@ -159,6 +168,7 @@ class HealthVaultTests(unittest.TestCase):
                     health_vault.restore_backup(backup, restored)
                 self.assertFalse(restored.exists())
 
+    # A valid encryption token and matching lookup ID must not make an invalid date acceptable.
     def test_backup_rejects_authenticated_but_invalid_entry_date(self):
         # Even valid Fernet ciphertext and matching HMAC IDs must not bypass
         # the data validation normally applied by put().
@@ -181,6 +191,7 @@ class HealthVaultTests(unittest.TestCase):
             health_vault.restore_backup(backup, restored)
         self.assertFalse(restored.exists())
 
+    # A structurally valid SQLite database with damaged ciphertext must fail entry verification.
     def test_backup_with_tampered_encrypted_entry_is_rejected(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         # Change an encrypted record while keeping the SQLite file structurally valid.
@@ -199,6 +210,7 @@ class HealthVaultTests(unittest.TestCase):
             health_vault.restore_backup(backup, restored)
         self.assertFalse(restored.exists())
 
+    # Reject records whose secret lookup ID does not match the decrypted identity.
     def test_backup_with_mismatched_secret_entry_id_is_rejected(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         with closing(sqlite3.connect(self.db)) as conn, conn:
@@ -211,6 +223,7 @@ class HealthVaultTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
             health_vault.verify_backup(backup)
 
+    # Exercise backup, verification and recovery of several fictional records into an independent copy.
     def test_recovery_drill_restores_multiple_entries_without_touching_original(self):
         """Exercise the full backup/verify/restore/read workflow offline."""
         original = {
@@ -240,6 +253,7 @@ class HealthVaultTests(unittest.TestCase):
         )
         self.assertEqual(health_vault.verify_backup(backup), len(original))
 
+    # Verify entry counts without creating a restored file; reject wrong keys and altered backup bytes.
     def test_verify_backup_authenticates_and_counts_encrypted_entries(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         health_vault.put("2026-11-21", "Sleep", {"answer": "Severe"}, self.db)
@@ -256,6 +270,7 @@ class HealthVaultTests(unittest.TestCase):
         with self.assertRaises(InvalidToken):
             health_vault.verify_backup(backup)
 
+    # Reject a symbolic link supplied as the backup path.
     def test_verify_backup_rejects_symlink(self):
         backup = Path(self.tmp.name) / "verified-backup.enc"
         health_vault.encrypted_backup(backup, self.db)
@@ -264,6 +279,7 @@ class HealthVaultTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "symlink"):
             health_vault.verify_backup(linked)
 
+    # Simulate a disk write failure and check that the partial backup is removed without harming the vault.
     def test_failed_backup_write_removes_incomplete_destination(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         backup = Path(self.tmp.name) / "failed-backup.enc"
@@ -290,6 +306,7 @@ class HealthVaultTests(unittest.TestCase):
         self.assertFalse(backup.exists())
         self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
 
+    # Simulate a restore write failure and ensure no incomplete restored database remains.
     def test_failed_restore_write_removes_incomplete_destination(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         backup = Path(self.tmp.name) / "backup.enc"
@@ -321,6 +338,7 @@ class HealthVaultTests(unittest.TestCase):
         self.assertFalse(restored.exists())
         self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
 
+    # Alter backup bytes and verify that restoration fails without creating a database.
     def test_corrupted_backup_cannot_create_restored_database(self):
         health_vault.put("2026-11-20", "Sleep", {"answer": "Mild"}, self.db)
         backup = Path(self.tmp.name) / "backup.enc"
@@ -335,6 +353,7 @@ class HealthVaultTests(unittest.TestCase):
         self.assertEqual(health_vault.get("2026-11-20", "Sleep", self.db), {"answer": "Mild"})
 
     @unittest.skipIf(os.name == "nt", "POSIX permission checks only")
+    # On POSIX systems, verify owner-only file and directory permissions.
     def test_vault_and_restored_backup_permissions(self):
         self.assertEqual(self.db.stat().st_mode & 0o777, 0o600)
         self.assertEqual(self.db.parent.stat().st_mode & 0o777, 0o700)
@@ -352,6 +371,7 @@ class HealthVaultTests(unittest.TestCase):
         self.assertEqual(restore_dir.stat().st_mode & 0o777, 0o700)
 
     @unittest.skipIf(os.name == "nt", "Symlink test requires POSIX support")
+    # On supported systems, reject symbolic links for vault and backup operations.
     def test_symlink_paths_are_rejected(self):
         linked_vault = Path(self.tmp.name) / "linked-vault.db"
         linked_vault.symlink_to(self.db)
@@ -368,6 +388,7 @@ class HealthVaultTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             health_vault.encrypted_backup(linked_backup, self.db)
 
+    # An existing backup must remain byte-for-byte unchanged when an overwrite is attempted.
     def test_backup_refuses_overwrite(self):
         backup = Path(self.tmp.name) / "backup.enc"
         health_vault.encrypted_backup(backup, self.db)
@@ -376,6 +397,7 @@ class HealthVaultTests(unittest.TestCase):
             health_vault.encrypted_backup(backup, self.db)
         self.assertEqual(backup.read_bytes(), original)
 
+    # Reject the obsolete schema that exposes dates and question names as plaintext.
     def test_legacy_plaintext_metadata_schema_is_rejected(self):
         legacy = Path(self.tmp.name) / "legacy.db"
         with closing(sqlite3.connect(legacy)) as conn, conn:
@@ -388,6 +410,7 @@ class HealthVaultTests(unittest.TestCase):
             health_vault.encrypted_backup(Path(self.tmp.name) / "legacy.enc", legacy)
         self.assertFalse((Path(self.tmp.name) / "legacy.enc").exists())
 
+    # Simulate database creation failure and check that incomplete files are removed.
     def test_failed_provision_removes_incomplete_database(self):
         failed = Path(self.tmp.name) / "failed-vault.db"
         with patch.object(health_vault.sqlite3, "connect", side_effect=sqlite3.OperationalError("simulated disk error")):
@@ -396,11 +419,13 @@ class HealthVaultTests(unittest.TestCase):
         self.assertFalse(failed.exists())
         self.assertEqual(health_vault.get("2026-11-20", "Anxiety", self.db), None)
 
+    # Do not permit reads when the encryption key is missing.
     def test_missing_key_fails_closed(self):
         with patch.dict(os.environ, {"HEALTH_VAULT_KEY": ""}):
             with self.assertRaises(RuntimeError):
                 health_vault.get("2026-11-20", "Anxiety", self.db)
 
+    # Check correct and incorrect passwords, malformed hashes and minimum password length.
     def test_password_hash_verification(self):
         encoded = health_vault.password_hash("a long unique passphrase")
         self.assertTrue(health_vault.verify_password("a long unique passphrase", encoded))
