@@ -3,6 +3,7 @@ from datetime import date
 from favourite_feed.health_report import build_report
 
 class ReportTests(unittest.TestCase):
+    # An empty thirty-day report should have the correct start date and no invented symptom or association rows.
     def test_empty(self):
         r=build_report(date(2026,1,30),30,[],lambda d:[],lambda d:None)
         self.assertEqual(r["start"],"2026-01-01")
@@ -10,6 +11,7 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(r["symptoms"],[])
         self.assertEqual(r["associations"],[])
 
+    # Include explicit zero severity, select medication status effective by the report date, exclude future changes and count monthly observations.
     def test_history_and_explicit_zero(self):
         items=[{"name":"Example","category":"Medication","history":[
             {"day":"2025-12-01","status":"Taking","dose":"Example dose"},
