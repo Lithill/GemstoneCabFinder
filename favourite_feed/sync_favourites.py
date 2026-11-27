@@ -10,6 +10,7 @@ SOURCE_DB = PROJECT_ROOT / "data" / "gemstone_sellers.db"
 FAVOURITES_FILE = PROJECT_ROOT / "data" / "favourited_shops.txt"
 
 
+# Combine names from the read-only legacy database and manual favourites file.
 def load_favourite_names():
     names = set()
     with closing(sqlite3.connect(SOURCE_DB.as_uri() + "?mode=ro", uri=True)) as conn:
@@ -24,6 +25,7 @@ def load_favourite_names():
     return sorted(names)
 
 
+# Upsert the monitored shop and remember its source-name mapping in one transaction.
 def save_shop(source_name, shop):
     with connect_database() as conn:
         conn.execute("""
@@ -41,6 +43,7 @@ def save_shop(source_name, shop):
         """, (source_name, shop["shop_id"]))
 
 
+# Resolve only names without saved mappings, optionally limiting this run.
 def sync_favourites(limit=None):
     names = load_favourite_names()
     setup_database()
@@ -57,6 +60,7 @@ def sync_favourites(limit=None):
     print("Shops to look up this run:", len(pending))
     unmatched = []
     failed = False
+    # Look up exact shop names through Etsy and retain successful progress if a later request fails.
     for index, name in enumerate(pending, 1):
         print(f"[{index}/{len(pending)}] Looking up {name}", flush=True)
         try:
@@ -81,6 +85,7 @@ def sync_favourites(limit=None):
     return 1 if failed else 0
 
 
+# Validate the optional positive command-line limit before starting live lookups.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int)
