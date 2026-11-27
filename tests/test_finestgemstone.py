@@ -3,6 +3,7 @@ import os
 import requests
 from dotenv import load_dotenv
 
+# Manual live diagnostic, not an automated test; credentials are loaded only when explicitly run.
 def main():
     load_dotenv()
 
@@ -20,6 +21,7 @@ def main():
         "agate cabochon",
     ]
 
+    # Compare marketplace search terms and count titles mentioning Shazar.
     for term in search_terms:
         print(f"\nSearching for: {term}")
 
@@ -57,6 +59,7 @@ def main():
 
         print("\nChecking shop ID 14333472...")
 
+    # Look up the specific seller independently of marketplace search results.
     shop_url = "https://openapi.etsy.com/v3/application/shops/14333472"
 
     response = requests.get(
@@ -75,5 +78,6 @@ def main():
         print(response.text[:500])
 
 
+# Prevent unittest discovery from making live Etsy requests on import.
 if __name__ == "__main__":
     main()
