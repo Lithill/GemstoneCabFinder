@@ -3,9 +3,11 @@ import csv
 import sqlite3
 from pathlib import Path
 
+# Use the legacy seller database and exported favourites CSV.
 DB_PATH = Path("data/gemstone_sellers.db")
 CSV_PATH = Path("data/etsy_favourites_complete.csv")
 
+# Create the favourites table if needed; names are case-insensitive primary keys.
 with sqlite3.connect(DB_PATH) as conn:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS favourite_shops (
@@ -14,6 +16,7 @@ with sqlite3.connect(DB_PATH) as conn:
         )
     """)
 
+    # Read CSV headers and handle an optional UTF-8 byte order mark.
     with CSV_PATH.open(
         "r", encoding="utf-8-sig", newline=""
     ) as file:
@@ -23,6 +26,7 @@ with sqlite3.connect(DB_PATH) as conn:
             name = row["name"].strip()
             url = row["url"].strip()
 
+            # Insert valid rows or update the URL of an existing name without duplicating it.
             if name and url:
                 conn.execute("""
                     INSERT INTO favourite_shops
