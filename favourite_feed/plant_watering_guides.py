@@ -3,6 +3,7 @@
 Ranges assume ordinary draining pots in indoor light. Always use the species'
 moisture check first. Winter/cool room slows drying; warm rooms may speed it up.
 """
+# Each four-number list gives spring/summer minimum and maximum, then autumn/winter minimum and maximum, in days. These are moisture-check suggestions, not watering deadlines.
 CHECK_INTERVALS = {
     "Money tree": [
         7,
