@@ -7,6 +7,7 @@ from favourite_feed.filters import is_visible, DEFAULT_EXCLUSIONS, DEFAULT_PREFE
 from favourite_feed.currency import price_context
 from favourite_feed import refresh_jobs
 
+# Read saved filtering preferences or supply defaults for a new installation.
 def preferences(conn):
     conn.execute("CREATE TABLE IF NOT EXISTS feed_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
     row = conn.execute("SELECT value FROM feed_settings WHERE id=1").fetchone()
@@ -23,6 +24,7 @@ def preferences(conn):
         return settings
     return dict(exclusions=list(DEFAULT_EXCLUSIONS), preferences=list(DEFAULT_PREFERENCES), preferred_only=False, show_excluded=False, finished_jewellery_defaults_v1=True)
 
+# GET displays the settings form; POST saves the submitted filters and returns to the feed.
 def settings():
     with connect_database() as conn:
         current = preferences(conn)
@@ -33,12 +35,14 @@ def settings():
             return redirect(url_for("index"))
     return render_template("settings.html", settings=current)
 
+# Create the undo history table if needed, storing each listing's previous state.
 def ensure_history(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS feed_actions (
         action_id INTEGER PRIMARY KEY, listing_id INTEGER NOT NULL,
         old_seen TEXT, old_liked INTEGER NOT NULL)""")
 
 
+# Handle a single seen/favourite action, validating the request and recording the old state first.
 def action(listing_id):
     operation = request.form.get("operation")
     if operation not in ("seen", "like", "unseen", "unlike"):
@@ -55,6 +59,7 @@ def action(listing_id):
         liked = 0 if operation == "unlike" else int(operation == "like" or row["liked"])
         conn.execute("UPDATE listings SET seen_at=?, liked=? WHERE listing_id=?", (seen, liked, listing_id))
     print(f"Feed action: {listing_id} operation={operation}", flush=True)
+    # Swipe mode expects a small JSON response instead of a full page redirect.
     if request.headers.get("X-Feed-Action") == "swipe":
         with connect_database() as conn:
             saved = conn.execute("SELECT liked, seen_at FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
@@ -94,6 +99,7 @@ def mark_page_seen():
     return redirect(url_for("index", mode="unseen", page=1), code=303)
 
 
+# Restore the most recent recorded listing state and remove that entry from undo history.
 def undo():
     with connect_database() as conn:
         ensure_history(conn)
@@ -106,6 +112,7 @@ def undo():
     return redirect(url_for("index", mode=request.form.get("mode", "unseen"), view="swipe" if request.form.get("view") == "swipe" else "grid"))
 
 
+# Make the currency formatting helper available to all page templates.
 def currency_context():
     return {"price_display": price_context()}
 
@@ -118,6 +125,7 @@ def feed_breakdown(rows, filters, refresh_status):
                           preferred_only=filters["preferred_only"],
                           show_excluded=filters["show_excluded"])
 
+    # Count each listing in exactly one of three groups: seen, filtered or visible unseen.
     def tally(items):
         counts = {"collected": len(items), "unseen": 0, "filtered": 0, "seen": 0}
         for row in items:
@@ -155,6 +163,7 @@ def dashboard():
                            refresh_status=refresh_jobs.snapshot())
 
 
+# Build the main feed from saved listings, applying filters, display mode and pagination.
 def index():
     mode = request.args.get("mode", "unseen")
     with connect_database() as conn:
@@ -166,15 +175,18 @@ def index():
             FROM listings l JOIN monitored_shops s USING(shop_id)
             ORDER BY published_at DESC, listing_id DESC
         """).fetchall()
+    # Calculate totals before filtering so the page can explain where all collected listings went.
     breakdown = feed_breakdown(rows, filters, refresh_jobs.snapshot())
     listings = [r for r in rows if
                 (mode == "liked" and r["liked"]) or
                 (mode == "seen" and r["seen_at"]) or
                 (mode == "unseen" and not r["seen_at"] and is_visible(r["title"], exclusions=filters["exclusions"], preferences=filters["preferences"], preferred_only=filters["preferred_only"], show_excluded=filters["show_excluded"]))]
+    # Show recently marked favourites first; unseen swipe mode instead displays one listing at a time.
     if mode == "liked":
         listings.sort(key=lambda row: (row["seen_at"] or "", row["listing_id"]), reverse=True)
     if mode == "unseen" and request.args.get("view") == "swipe":
         return render_template("swipe.html", item=listings[0] if listings else None, count=len(listings), refresh_status=refresh_jobs.snapshot(), breakdown=breakdown)
+    # Divide the filtered list into pages of ten and keep the requested page within bounds.
     total_listings = len(listings)
     page_size = 10
     total_pages = max(1, (total_listings + page_size - 1) // page_size)
@@ -189,6 +201,7 @@ def index():
                            refresh_status=refresh_jobs.snapshot(), breakdown=breakdown)
 
 
+# Mark a listing as seen before redirecting to its stored Etsy address.
 def etsy(listing_id):
     with connect_database() as conn:
         ensure_history(conn)
@@ -201,6 +214,7 @@ def etsy(listing_id):
             conn.execute("UPDATE listings SET seen_at=? WHERE listing_id=?", (datetime.now(timezone.utc).isoformat(),listing_id))
     return redirect(row["listing_url"], code=303)
 
+# Load the selected listing, its seller name and all saved photos for the detail page.
 def detail(listing_id):
     with connect_database() as conn:
         listing = conn.execute("SELECT l.*, s.shop_name FROM listings l JOIN monitored_shops s USING(shop_id) WHERE listing_id=?", (listing_id,)).fetchone()
@@ -211,6 +225,7 @@ def detail(listing_id):
 
 
 
+# Associate URL paths and HTTP methods with the functions above. GET reads pages; POST submits actions.
 def register_feed_routes(app):
     app.route("/settings", methods=["GET", "POST"])(settings)
     app.post("/action/<int:listing_id>")(action)
