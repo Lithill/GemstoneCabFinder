@@ -3,7 +3,7 @@
 // Define question categories and input types; names and answer formats must agree with the server's validation rules.
 const groups = [
   {name:"Daily questions",items:[
-    ["Hot flushes","yesno"],["Night sweats","yesno"],["Did you drink alcohol yesterday?","yesno"]
+    ["Hot flushes","yesno"],["Night sweats","yesno"],["Did you drink alcohol yesterday?","yesno"],["Did you have a nap today?","yesno"]
   ]},
   {name:"Periods and bleeding",items:[
     ["Period / bleeding today","period"],["Period start or end date","date"],["Cycle changes or irregular periods","severity"],["Heavy bleeding or flooding","severity"]
