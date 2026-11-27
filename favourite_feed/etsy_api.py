@@ -6,11 +6,14 @@ from dotenv import load_dotenv
 
 from favourite_feed.database import PROJECT_ROOT
 
+# Use Etsy's application API rather than scraping its website.
 BASE_URL = "https://openapi.etsy.com/v3/application"
 REQUEST_INTERVAL = 0.25
+# Reuse HTTP connections between requests to reduce connection overhead.
 SESSION = requests.Session()
 
 
+# Read credentials from environment variables or the local .env file, not hard-coded secrets.
 def get_headers():
     load_dotenv(PROJECT_ROOT / ".env")
     key = os.getenv("ETSY_API_KEY")
@@ -20,8 +23,10 @@ def get_headers():
     return {"x-api-key": f"{key}:{secret}"}
 
 
+# Send an authenticated GET request and decode Etsy's JSON response.
 def etsy_get(endpoint, params=None):
     headers = get_headers()
+    # Allow up to three attempts, spacing requests and retrying temporary network or server failures.
     for attempt in range(3):
         time.sleep(REQUEST_INTERVAL)
         try:
@@ -34,6 +39,7 @@ def etsy_get(endpoint, params=None):
                 raise
             time.sleep(5)
             continue
+        # Stop on Etsy's rate limit rather than continuing to send requests.
         if response.status_code == 429:
             raise RuntimeError("Etsy API rate limit reached; stopping.")
         if response.status_code >= 500 and attempt < 2:
@@ -43,6 +49,7 @@ def etsy_get(endpoint, params=None):
         return response.json()
 
 
+# Search all returned pages for an exact shop name and accept only one unique matching shop ID.
 def find_shop_by_name(shop_name):
     offset = 0
     matches = {}
