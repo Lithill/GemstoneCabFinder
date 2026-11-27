@@ -71,3 +71,25 @@ class DiscoveryTests(unittest.TestCase):
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM discovery_shops").fetchone()[0],79)
                 self.assertEqual(conn.execute("SELECT status FROM discovery_shops WHERE shop_id=60611701").fetchone()[0],"reject")
                 self.assertIsNone(conn.execute("SELECT 1 FROM discovery_shops WHERE shop_id=61104361").fetchone())
+
+    def test_missing_shop_does_not_block_queue(self):
+        from requests import Response
+        from requests.exceptions import HTTPError
+        with TemporaryDirectory() as tmp, patch.object(database,"DB_PATH",Path(tmp)/"test.db"):
+            database.setup_database()
+            discovery.start()
+            with database.connect_database() as conn:
+                conn.execute("INSERT INTO discovery_queue VALUES(1,'Needs checking',2)")
+            response = Response()
+            response.status_code = 503
+            with patch.object(discovery,"etsy_get",side_effect=HTTPError(response=response)):
+                with self.assertRaises(HTTPError):
+                    discovery.step()
+            with database.connect_database() as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM discovery_queue").fetchone()[0],1)
+            response.status_code = 404
+            with patch.object(discovery,"etsy_get",side_effect=HTTPError(response=response)):
+                self.assertEqual(discovery.step(),"Skipped unavailable shop 1")
+            with database.connect_database() as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM discovery_queue").fetchone()[0],0)
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM discovery_checked").fetchone()[0],1)
