@@ -48,3 +48,12 @@ def get_validated(day: str, question: str, *, path: Path) -> dict | None:
         return None
     return validate_entry(day, question, answer)["answer"]
 
+
+def get_many_validated(day: str, questions, *, path: Path) -> dict:
+    """Read known questions together, validating every returned answer."""
+    questions = tuple(questions)
+    for question in questions:
+        _validate_identity(day, question)
+    answers = health_vault.get_many(day, questions, path)
+    return {question: validate_entry(day, question, answer)["answer"]
+            for question, answer in answers.items()}
