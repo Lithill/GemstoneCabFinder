@@ -157,3 +157,10 @@ def register_seller_routes(app, refresh_lock):
         if not shop:
             abort(404)
         return render_template("shop_import.html", shop=shop, progress=progress)
+
+
+    # A read-only overview makes saved imports discoverable after leaving their progress pages.
+    @app.get("/shop-imports")
+    def shop_imports():
+        from favourite_feed.shop_import_jobs import list_jobs
+        return render_template("shop_imports.html", jobs=list_jobs())
