@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Manage favourite shops</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head>
-<body><header><h1>Manage favourite shops</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a><a href="/refresh">Refresh</a></nav></header>
+<body><header><h1>Manage favourite shops</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Gemstone Feed</a><a href="/refresh">Refresh</a><a href="/shop-imports">Listing imports</a></nav></header>
 {# Provide a form for adding a shop by exact name or Etsy URL. #}<main class="dashboard"><section class="dashboard-card"><h2>Add an Etsy shop</h2>
 <form method="post"><input type="hidden" name="operation" value="add"><label for="shop">Exact shop name or Etsy shop URL</label><input id="shop" name="shop" required maxlength="500" placeholder="https://www.etsy.com/shop/ShopName"><button type="submit">Add shop</button></form>
 <p>New shops monitor future listings from the time they are added. To bring in existing listings, use Import recent or Import all below. Existing listings and favourites are never deleted.</p>
