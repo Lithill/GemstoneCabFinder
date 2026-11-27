@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Refresh shops</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head><body>
 <header><a href="/dashboard">Dashboard</a><h1>Refresh shops</h1><a href="/">Back to feed</a></header>
-<main style="max-width:650px">
+{# Display the tracked refresh controls, progress and per-shop failures. #}<main style="max-width:650px">
 {% if demo %}<p><strong>Demo:</strong> checks only the three sample shops.</p>{% endif %}
 <p>You can browse other pages while the refresh runs. Progress is saved in the database. If you close the browser or lock your phone, processing may pause; reopening the site resumes it.</p>
 <button id="start">Start / resume refresh</button> <button id="pause">Pause</button>
@@ -9,12 +9,15 @@
 <a href="/">Browse gemstones</a>
 <script>
 const el=id=>document.getElementById(id);
+// Fetch fresh JSON from a refresh endpoint and reject unsuccessful HTTP responses.
 async function api(path,method='GET'){
  const r=await fetch(path,{method,cache:'no-store'});
  if(!r.ok)throw Error('HTTP '+r.status);
  return r.json();
 }
+// Display timestamps in UK local time.
 function format(iso){return iso?new Date(iso).toLocaleString('en-GB',{timeZone:'Europe/London',dateStyle:'medium',timeStyle:'short'}):'Never';}
+// Read the persisted refresh status and update the progress display without reloading the page.
 async function show(){
  try{
  const s=await api('/refresh/status');
@@ -27,8 +30,10 @@ async function show(){
  for(const issue of (s.issues||[])){const li=document.createElement('li');li.textContent=issue.shop_name+': '+issue.message;el('failures').appendChild(li);}
  }catch(e){el('status').textContent='Unable to read refresh status: '+e.message;}
 }
+// Start or resume a tracked refresh and request updated exchange rates separately.
 el('start').onclick=async()=>{try{await api('/refresh/start','POST');api('/refresh/rates','POST').catch(()=>{});await show();}catch(e){alert(e.message);}};
 el('pause').onclick=async()=>{try{await api('/refresh/pause','POST');await show();}catch(e){alert(e.message);}};
+// Poll the display every two seconds; the shared refresh worker performs the actual steps.
 setInterval(show,2000);show();
 </script><script src="{{ url_for('static',filename='refresh_worker.js') }}"></script>
 </main></body></html>
