@@ -6,21 +6,25 @@ from favourite_feed.etsy_api import etsy_get
 
 
 SHOPS = {"999GEMS": 30037649, "A2ZStones": 17921936, "AAjewelryIndonesia": 46474596}
+# Inspect several Etsy timestamp fields to distinguish creation and later changes.
 TIMESTAMP_FIELDS = ("creation_timestamp", "created_timestamp",
                     "original_creation_timestamp", "last_modified_timestamp",
                     "updated_timestamp", "state_timestamp")
 
 
+# Convert numeric Unix timestamps to readable UTC dates.
 def display_timestamp(value):
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(value, timezone.utc).isoformat()
     return value
 
 
+# Make live read requests for selected shops without writing feed records.
 def main():
     for name, shop_id in SHOPS.items():
         print(f"\n=== {name} ({shop_id}) ===", flush=True)
         endpoint = f"shops/{shop_id}/listings/active"
+        # Compare two pages of five listings ordered newest first.
         for offset in (0, 5):
             data = etsy_get(endpoint, {
                 "limit": 5, "offset": offset,
@@ -36,6 +40,7 @@ def main():
                     **{key: display_timestamp(listing.get(key))
                        for key in TIMESTAMP_FIELDS},
                 }, ensure_ascii=True))
+            # Inspect a sample of image metadata for the first listing.
             if offset == 0 and listings:
                 listing_id = listings[0]["listing_id"]
                 images = etsy_get(f"listings/{listing_id}/images")["results"]
