@@ -65,3 +65,13 @@ def step(sid):
     with connect_database() as conn:
         conn.execute("UPDATE shop_import_jobs SET done=1 WHERE shop_id=? AND pending='[]' AND last_page=1", (sid,))
     return status(sid)
+
+
+# List the latest saved import for each shop without making any Etsy requests.
+def list_jobs():
+    with connect_database() as conn:
+        setup(conn)
+        return conn.execute("""SELECT j.shop_id, s.shop_name, j.total, j.processed,
+            j.imported, j.skipped, j.done FROM shop_import_jobs j
+            JOIN monitored_shops s ON s.shop_id=j.shop_id
+            ORDER BY j.done, s.shop_name COLLATE NOCASE""").fetchall()
