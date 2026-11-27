@@ -27,3 +27,12 @@ class ShopManagementTests(unittest.TestCase):
                 row=conn.execute("SELECT * FROM monitored_shops").fetchone()
                 self.assertEqual(row["baseline_at"],row["last_checked"])
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0],1)
+
+    def test_identity_mismatch_does_not_insert(self):
+        with TemporaryDirectory() as tmp, patch.object(database,"DB_PATH",Path(tmp)/"test.db"):
+            database.setup_database()
+            with patch("favourite_feed.shop_management.find_shop_by_name",return_value={"shop_id":123,"shop_name":"ExampleShop"}):
+                with self.assertRaises(ValueError):
+                    add_shop("ExampleShop", expected_id=999)
+            with database.connect_database() as conn:
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM monitored_shops").fetchone()[0],0)
