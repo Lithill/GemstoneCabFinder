@@ -9,7 +9,7 @@ from pathlib import Path
 
 from favourite_feed.health_answers import QUESTIONS, validate_entry
 from favourite_feed.health_checkins import put_checkin
-from favourite_feed.health_entries import get_validated
+from favourite_feed.health_entries import get_many_validated
 
 
 def _convert(entry):
@@ -80,8 +80,9 @@ def read_diary_offline(day: str, *, path: Path) -> list:
     """Read the same shape used by the prototype, without restoring notes."""
     prepare_diary(day, [])
     diary = []
+    answers = get_many_validated(day, QUESTIONS, path=path)
     for question in QUESTIONS:
-        answer = get_validated(day, question, path=path)
+        answer = answers.get(question)
         if answer is None:
             continue
         extras = [f"{key}: {answer[key]}" for key in ("flow", "detail", "hours", "unit") if key in answer]
