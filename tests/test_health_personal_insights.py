@@ -5,16 +5,19 @@ from favourite_feed.health_personal_insights import summarize
 
 
 class PersonalInsightsTests(unittest.TestCase):
+    # Accept all four supported severity choices for fibromyalgia pain.
     def test_pain_question(self):
         for value in ("None","Mild","Moderate","Severe"):
             self.assertEqual(validate_entry("2026-01-01","Fibromyalgia pain",{"answer":value})["answer"]["answer"],value)
 
+    # Return no higher or lower associations when no records exist, with pending comparisons instead.
     def test_empty(self):
         result=summarize(date(2026,1,30),[],lambda d:[],lambda d:None)
         self.assertEqual(result["lower"],[])
         self.assertEqual(result["higher"],[])
         self.assertEqual(len(result["pending"]),4)
 
+    # Check that a fictional lifestyle change yields a lower-severity comparison with fourteen observations on each side.
     def test_change(self):
         items=[{"name":"Example habit","history":[{"day":"2026-01-15","status":"Ongoing","dose":""}]}]
         def read(day):
