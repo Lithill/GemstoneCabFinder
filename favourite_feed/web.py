@@ -12,15 +12,20 @@ from favourite_feed.refresh_routes import register_refresh_routes
 from favourite_feed.seller_routes import register_seller_routes
 from favourite_feed.quiz_routes import register_quiz_routes
 
+# Create the Flask application that PythonAnywhere imports to serve the website.
 app = Flask(__name__)
+# Attach the houseplant section, which defines its own group of URLs.
 app.register_blueprint(plants_blueprint)
+# Share a lock between seller management and refresh routes to prevent overlapping locked operations within this process.
 refresh_lock = Lock()
 
+# Only attach the private health pages when explicitly enabled in the environment.
 if os.environ.get("HEALTH_TRACKER_PREVIEW_ENABLED") == "1":
     from favourite_feed.health_staging import register_private_preview
     register_private_preview(app)
 
 
+# Tell browsers not to store responses, so pages show current data rather than cached copies.
 @app.after_request
 def prevent_stale_feed(response):
     response.headers["Cache-Control"] = "no-store"
@@ -37,12 +42,14 @@ def symptom_tracker():
     return response
 
 
+# Connect each section's functions to its website addresses.
 register_feed_routes(app)
 register_refresh_routes(app, refresh_lock)
 register_seller_routes(app, refresh_lock)
 register_quiz_routes(app)
 
 
+# Start a local development server only when this file is executed directly.
 if __name__ == "__main__":
     setup_database()
     app.run(host="127.0.0.1", port=5000, debug=False)
