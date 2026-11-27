@@ -5,10 +5,12 @@ from favourite_feed.health_answers import QUESTIONS, validate_entry
 
 
 class SymptomAnswerTests(unittest.TestCase):
+    # Check the expected 37 questions and eight answer types.
     def test_all_current_question_types_are_covered(self):
         self.assertEqual(set(QUESTIONS.values()), {"yesno", "period", "date", "severity", "sleep", "uti", "libido", "weight"})
         self.assertEqual(len(QUESTIONS), 37)
 
+    # Validate examples of every answer type and ensure the returned answer is a separate object.
     def test_valid_answers_are_canonical_and_do_not_mutate_input(self):
         samples = [
             ("Hot flushes", {"answer": "Yes"}),
@@ -27,6 +29,7 @@ class SymptomAnswerTests(unittest.TestCase):
                 self.assertEqual(result["answer"], answer)
                 self.assertIsNot(result["answer"], answer)
 
+    # Reject unknown questions, unsupported fields, invalid choices and out-of-range or nonfinite numbers.
     def test_invalid_answers_fail_closed(self):
         samples = [
             ("Not a symptom", {"answer": "Mild"}),
@@ -50,6 +53,7 @@ class SymptomAnswerTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_entry("2026-11-21", question, answer)
 
+    # Require real calendar dates in canonical YYYY-MM-DD format.
     def test_invalid_entry_date_rejected(self):
         for day in ("not-a-date", "2026-02-30", "2026-1-2"):
             with self.subTest(day=day):
