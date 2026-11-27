@@ -1,5 +1,6 @@
 "use strict";
 // Prototype only. Entries are held in JavaScript memory and never transmitted or persisted.
+// Define question categories and input types; names and answer formats must agree with the server's validation rules.
 const groups = [
   {name:"Daily questions",items:[
     ["Hot flushes","yesno"],["Night sweats","yesno"]
@@ -23,16 +24,20 @@ const groups = [
     ["Weight measurement","weight"]
   ]}
 ];
+// Flatten the categories into an ordered list for guided navigation.
 const questions=groups.flatMap(g=>g.items.map(([name,type])=>({name,type,category:g.name})));
 const $=id=>document.getElementById(id);
+// Keep the editable diary in browser memory. In private storage mode the separate staging client loads and saves it explicitly.
 const diary=[];
 let step=0, current=null;
+// Build DOM elements using textContent for displayed values rather than interpreting user text as HTML.
 function el(tag,attrs={},parent){
   const node=document.createElement(tag);
   Object.entries(attrs).forEach(([k,v])=>{if(k==="text")node.textContent=v;else if(k==="className")node.className=v;else node.setAttribute(k,v);});
   if(parent)parent.appendChild(node);
   return node;
 }
+// Build a labelled input or radio group with a common value interface.
 function field(parent,label,type,options){
   const wrap=el("div",{className:"tracker-field"},parent);
   const id="field-"+parent.id+"-"+parent.children.length;
@@ -53,6 +58,7 @@ function field(parent,label,type,options){
   if(type==="number"){input.min="0";input.step="any";}
   return input;
 }
+// Choose the appropriate answer and extra fields for each question type.
 function fields(parent,q){
   parent.replaceChildren();
   const inputs={};
@@ -80,12 +86,14 @@ function fields(parent,q){
   inputs.notes=field(parent,"Optional notes (not saved)","text");
   return inputs;
 }
+// Skip unanswered questions and package the selected answer and optional fields for the local diary.
 function collect(q,inputs){
   const answer=inputs.answer.value.trim();
   if(!answer)return null;
   const extras=Object.entries(inputs).filter(([key])=>key!=="answer"&&key!=="notes").map(([key,input])=>input.value.trim()?key+": "+input.value.trim():"").filter(Boolean);
   return {name:q.name,answer,extras,notes:inputs.notes.value.trim()};
 }
+// Replace an existing answer to the same question rather than adding a duplicate.
 function add(entry){
   if(!entry)return false;
   const existing=diary.findIndex(item=>item.name===entry.name);
@@ -94,6 +102,7 @@ function add(entry){
   renderDiary();
   return true;
 }
+// Restore the current local answer and its extra fields when editing.
 function prefill(q,inputs){
   const saved=diary.find(item=>item.name===q.name);
   if(!saved)return;
@@ -106,12 +115,14 @@ function prefill(q,inputs){
   }
   inputs.notes.value=saved.notes||"";
 }
+// Remove other period answers from the local draft only; this does not delete stored answers.
 function removePeriodDetails(){
   for(let i=diary.length-1;i>=0;i--){
     if(questions.some(q=>q.category==="Periods and bleeding"&&q.type!=="period"&&q.name===diary[i].name))diary.splice(i,1);
   }
   renderDiary();
 }
+// Rebuild the visible diary and notify the storage client that the draft may have changed.
 function renderDiary(){
   $("entry-count").textContent=diary.length+" entries";
   document.dispatchEvent(new Event("tracker:diary-changed"));
@@ -135,18 +146,21 @@ function renderDiary(){
     });
     const remove=el("button",{type:"button",text:"Remove", "aria-label":"Remove "+item.name},row);
     remove.addEventListener("click",()=>{diary.splice(i,1);renderDiary();});
+    // Offer explicit deletion of stored answers only when the private storage client is available.
     if (typeof window.stagingDeleteEntry === "function") {
       const deleteSaved=el("button",{type:"button",text:"Delete saved entry"},row);
       deleteSaved.addEventListener("click",()=>window.stagingDeleteEntry(item.name));
     }
   });
 }
+// Switch between guided and quick entry panels.
 function showMode(mode){
   $("guided").hidden=mode!=="guided";
   $("quick").hidden=mode!=="quick";
   if(mode==="guided")showStep();
   if(mode==="quick")quickFields();
 }
+// Collect the current answer and advance through the ordered questions.
 function guidedAdvance(){
   if(step>=questions.length)return;
   const question=questions[step];
@@ -173,6 +187,7 @@ function guidedAutoAdvance(q){
     guidedAdvance();
   });
 }
+// Render the current guided question or the completion screen and restore any draft answer.
 function showStep(){
   if(step>=questions.length){
     $("guided-question").textContent="Guided check-in complete";
@@ -233,6 +248,7 @@ $("guided-next").addEventListener("click",()=>{
   guidedAdvance();
 });
 let quickCategory=0,quickSymptom=0;
+// Build reusable radio-button selectors for quick entry categories and symptoms.
 function radioChoices(container,title,items,selected,onSelect){
   container.replaceChildren();
   const fieldset=el("fieldset",{className:"tracker-radio-group"},container);
@@ -245,6 +261,7 @@ function radioChoices(container,title,items,selected,onSelect){
     el("span",{text:label},row);
   });
 }
+// Rebuild the symptom choices when the selected category changes.
 function quickOptions(){
   radioChoices($("quick-category"),"Category",groups.map(g=>g.name),quickCategory,i=>{
     quickCategory=i;quickSymptom=0;quickOptions();
@@ -254,6 +271,7 @@ function quickOptions(){
   });
   quickFields();
 }
+// Render the selected quick-entry question and prefill its current answer.
 function quickFields(){
   const [name,type]=groups[quickCategory].items[quickSymptom];
   current=fields($("quick-fields"),{name,type});
@@ -264,5 +282,6 @@ $("quick-add").addEventListener("click",()=>{
   if(!add(collect({name,type},current))){alert("Choose a value before adding this entry.");return;}
   quickFields();
 });
+// Clear the local draft only, without sending a deletion request.
 $("clear-diary").addEventListener("click",()=>{diary.length=0;renderDiary();});
 quickOptions();renderDiary();
