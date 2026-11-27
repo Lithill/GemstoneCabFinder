@@ -12,6 +12,7 @@ from favourite_feed.health_checkins import put_checkin
 from favourite_feed.health_entries import get_many_validated
 
 
+# Translate the browser's entry format into the structured answer expected by the validator.
 def _convert(entry):
     if not isinstance(entry, dict) or set(entry) != {"name", "answer", "extras", "notes"}:
         raise ValueError("Unexpected prototype diary entry.")
@@ -24,13 +25,16 @@ def _convert(entry):
         raise ValueError("Invalid prototype entry details.")
     if len(notes) > 4096:
         raise ValueError("Prototype note is too long.")
+    # Build the stored answer without copying the notes field.
     result = {"answer": raw}
     for extra in extras:
         if not isinstance(extra, str) or ": " not in extra:
             raise ValueError("Malformed prototype extra.")
+        # Split an extra such as 'hours: 7' into its field name and value.
         key, value = extra.split(": ", 1)
         if key not in {"flow", "detail", "hours", "unit"} or not value or key in result:
             raise ValueError("Invalid or duplicate prototype extra.")
+        # Convert browser text into a numeric sleep duration and reject non-finite values.
         if key == "hours":
             try:
                 value = float(value)
@@ -39,6 +43,7 @@ def _convert(entry):
             if not math.isfinite(value):
                 raise ValueError("Invalid sleep hours.")
         result[key] = value
+    # Convert weight text into a number before applying the weight validation rules.
     if QUESTIONS[question] == "weight":
         try:
             result["answer"] = float(raw)
@@ -53,6 +58,7 @@ def prepare_diary(day: str, diary: list) -> dict:
     """Convert and validate a complete guided/quick-entry diary, without writing."""
     if not isinstance(diary, list) or len(diary) > len(QUESTIONS):
         raise ValueError("Invalid prototype diary.")
+    # Build a question-to-answer dictionary, rejecting repeated questions in the same submission.
     answers = {}
     for item in diary:
         question, answer = _convert(item)
@@ -71,6 +77,7 @@ def prepare_diary(day: str, diary: list) -> dict:
     return answers
 
 
+# Despite the historical function name, the private API also calls this helper to save validated diary entries.
 def save_diary_offline(day: str, diary: list, *, path: Path) -> int:
     """Explicit offline invocation only; never called from a Flask route."""
     return put_checkin(day, prepare_diary(day, diary), path=path)
@@ -80,7 +87,9 @@ def read_diary_offline(day: str, *, path: Path) -> list:
     """Read the same shape used by the prototype, without restoring notes."""
     prepare_diary(day, [])
     diary = []
+    # Read all supported questions for this date in one batch rather than opening a connection per question.
     answers = get_many_validated(day, QUESTIONS, path=path)
+    # Rebuild browser entries in the original question order; missing answers remain absent.
     for question in QUESTIONS:
         answer = answers.get(question)
         if answer is None:
