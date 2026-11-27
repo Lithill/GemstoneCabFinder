@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Import shop listings</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head>
+<body><header><h1>Import shop listings</h1><nav><a href="/favourite-shops">Favourite shops</a><a href="/discover">Discover</a><a href="/">Gemstone Feed</a></nav></header>
+<main class="dashboard"><section class="dashboard-card"><h2>{{ shop.shop_name }}</h2>
+<p>Keep this page open to import. You can pause or return later without losing saved progress.</p>
+<progress id="import-bar" aria-label="Listings processed" style="width:100%;height:24px" {% if progress.total %}max="{{ progress.total }}" value="{{ progress.processed }}"{% endif %}></progress>
+<p id="import-count" role="status">{{ progress.processed }} processed · {{ progress.imported }} imported · {{ progress.skipped }} skipped</p>
+<p id="import-status" role="status">{% if progress.done %}Import complete{% else %}Preparing import…{% endif %}</p>
+<button id="import-resume" {% if progress.done %}disabled{% endif %}>Resume import</button><button id="import-pause" disabled>Pause</button>
+</section></main><script src="{{ url_for('static',filename='shop_import.js') }}" defer></script></body></html>
