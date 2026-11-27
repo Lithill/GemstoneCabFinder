@@ -528,6 +528,7 @@ GEMS.update({
 })
 ALIASES = {alias.casefold(): name for name, (aliases, _) in GEMS.items() for alias in [name] + aliases}
 
+# Translate a known alias to its standard stored name; leave unfamiliar names intact.
 def canonical_name(name):
     return ALIASES.get(name.strip().casefold(), name.strip()) if name else name
 
@@ -535,6 +536,7 @@ def canonical_name(name):
 LABEL_FIXES = {"buf": "Buffalo turquoise", "oce": "Ocean jasper", "mys": "Mystic topaz", "aurora o": "Aurora opal", "moss": "Moss agate"}
 INCOMPLETE_LABELS = {"fire", "water", "mother", "titanium", "titani", "ioli", "lab", "tiffany"}
 
+# Repair known incomplete saved labels only when the listing title provides an unambiguous answer.
 def clean_label(name, title):
     key = name.strip().casefold()
     if key in INCOMPLETE_LABELS or key in LABEL_FIXES:
@@ -558,11 +560,13 @@ UNSAFE = re.compile(
 )
 
 
+# Normalise the custom-name collection before using the cached title classifier.
 def identify(title, custom=()):
     return _identify_cached(title, tuple(sorted(set(custom) - set(GEMS))))
 
 
 @lru_cache(maxsize=8)
+# Build regular expressions for custom names alongside the built-in patterns.
 def _patterns_for(custom):
     patterns = dict(PATTERNS)
     for name in custom:
@@ -576,7 +580,9 @@ def _identify_cached(title, custom):
     if not title or UNSAFE.search(title):
         return None
     patterns = _patterns_for(custom)
+    # Record each matched name and its character positions in the title.
     hits = [(name, m.start(), m.end()) for name, ps in patterns.items() for p in ps for m in p.finditer(title)]
+    # Discard shorter matches contained inside longer ones, then deduplicate the remaining names.
     matches = list({name for name, a, b in hits if not any(c <= a and d >= b and (c < a or d > b) for _, c, d in hits)})
     # Ignore broad colour-only cases, e.g. 'turquoise blue' is not a stone.
     if "Turquoise" in matches and re.search(r"\bturquoise\s+(?:blue|green|colour|color)\b", title, re.I):
@@ -586,10 +592,12 @@ def _identify_cached(title, custom):
 
 def options(name, seed, listing_id, available=None):
     """Return deterministic, shuffled multiple-choice options for a photo."""
+    # Prefer plausible lookalikes from the available materials, filling gaps from curated alternatives.
     pool = set(GEMS) if available is None else set(available)
     preferred = list(dict.fromkeys(GEMS.get(name, ([], []))[1] + visual_alternatives(name)))
     answers = [name] + list(dict.fromkeys(gem for gem in preferred if gem in pool and gem != name))
     answers.extend(gem for gem in preferred if gem not in answers and len(answers) < 4)
+    # Seed a local random generator using the session and listing ID so answer order stays consistent.
     rng = random.Random(int.from_bytes(hashlib.sha256(
         f"{seed}:{listing_id}:choices".encode("utf-8")).digest(), "big"))
     remaining = sorted(pool - set(answers))
@@ -659,11 +667,13 @@ DISPLAY_NAMES = {
     "Yooperlite": ("Sodalite-bearing rock", "Yooperlite"),
     "K2 granite": ("Azurite-bearing granite", "K2 stone"),
 }
+# These sets group named materials by typical origin or treatment, not verified properties of a particular stone.
 MANMADE = {"Fordite", "Surfite", "Rosarita", "Opalite", "Aurora opal", "Rainbow calsilica", "Watermelon quartz", "Mystic quartz"}
 COMPOSITE = {"Mohave turquoise", "Spiny oyster turquoise"}
 TREATED = {"Mystic topaz", "Titanium aura quartz", "Dyed howlite"}
 UNCERTAIN = {"Glacierite", "Peacock zoisite", "Sunstone lepidolite", "Dendrite fossil", "Yellow onyx", "Shiva lingam", "Wild horse jasper", "Iolite sunstone"}
 ORGANIC = {"Abalone", "Amber", "Jet", "Coral", "Pearl", "Mother of pearl", "Ammolite", "Ammonite", "Orthoceras", "Petrified wood", "Agatized dinosaur bone", "Fossil coral agate", "Petrified palm wood", "Opalised petrified wood", "Pink conch shell", "Spiny oyster", "Crinoid fossil", "Turritella jasper"}
+# Return a display name, alternate trade name and cautious origin description.
 def material_info(name):
     primary, alternate = DISPLAY_NAMES.get(name, (name or "", ""))
     if name in MANMADE:
@@ -680,10 +690,12 @@ def material_info(name):
         origin = "Natural mineral or rock type; treatment and authenticity unverified"
     return {"primary": primary, "alternate": alternate, "origin": origin}
 
+# Combine the primary name and alternate name for display without changing the stored quiz key.
 def display_answer(name):
     info = material_info(name)
     return info["primary"] + (" (" + info["alternate"] + ")" if info["alternate"] else "")
 
+# Map each material to the category used by the quiz mode selector.
 def material_category(name):
     if name in MANMADE or name in COMPOSITE or name in TREATED:
         return "manufactured"
@@ -718,9 +730,11 @@ VISUAL_FAMILIES = [
     "Muscovite|Biotite|Fuchsite|Lepidolite|Chlorite|Seraphinite",
     "Fordite|Surfite|Rainbow calsilica|Spiny oyster turquoise|Mohave turquoise",
 ]
+# Find other recognised gemstones in the same visual families and remove duplicates.
 def visual_alternatives(name):
     return list(dict.fromkeys(gem for family in VISUAL_FAMILIES for gem in family.split("|") if name in family.split("|") and gem != name and gem in GEMS))
 
+# Check for identical or simple overlapping primary names to reduce ambiguous answer choices.
 def overlapping(a, b):
     a, b = material_info(a)["primary"].casefold(), material_info(b)["primary"].casefold()
     return a == b or a in b.split() or b in a.split()
