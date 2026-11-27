@@ -3,9 +3,11 @@ from datetime import datetime, timezone
 from favourite_feed.database import connect_database
 from favourite_feed.refresh import refresh_shop
 
+# Store dates in UTC using ISO format so progress timestamps are consistent.
 def now():
     return datetime.now(timezone.utc).isoformat()
 
+# Create one table for overall refresh runs and another for the individual shops in each run.
 def ensure(conn):
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS refresh_runs (
@@ -23,12 +25,14 @@ def ensure(conn):
         );
     """)
 
+# Read saved progress for the website without contacting Etsy.
 def snapshot():
     with connect_database() as conn:
         ensure(conn)
         return _snapshot(conn)
 
 
+# Return the latest run and its failed-shop details using the existing database connection.
 def _snapshot(conn):
     row = conn.execute("SELECT * FROM refresh_runs ORDER BY run_id DESC LIMIT 1").fetchone()
     if not row:
@@ -40,6 +44,7 @@ def _snapshot(conn):
         "WHERE s.run_id=? AND s.status='failed' ORDER BY s.position", (row["run_id"],))]
     return data
 
+# Resume an unfinished run or create a new queue of currently active shops.
 def start():
     with connect_database() as conn:
         ensure(conn)
@@ -51,6 +56,7 @@ def start():
                 WHERE run_id=? AND status='working' AND claimed_at < datetime('now', '-10 minutes')""", (existing["run_id"],))
             conn.execute("UPDATE refresh_runs SET status='running', error=NULL WHERE run_id=?", (existing["run_id"],))
             return snapshot_after(conn, existing["run_id"])
+        # Take a snapshot of active sellers so the run has a fixed total.
         shops = conn.execute("SELECT shop_id FROM monitored_shops WHERE is_active=1 ORDER BY shop_id").fetchall()
         cur = conn.execute("INSERT INTO refresh_runs(started_at,status,total) VALUES(?,'running',?)", (now(),len(shops)))
         run_id = cur.lastrowid
@@ -60,9 +66,11 @@ def start():
             conn.execute("UPDATE refresh_runs SET status='completed', finished_at=? WHERE run_id=?", (now(),run_id))
         return snapshot_after(conn, run_id)
 
+# Read the updated run within the current transaction.
 def snapshot_after(conn, run_id):
     return dict(conn.execute("SELECT * FROM refresh_runs WHERE run_id=?", (run_id,)).fetchone())
 
+# Prevent further steps from claiming shops; an already running request may still finish.
 def pause():
     with connect_database() as conn:
         ensure(conn)
@@ -84,9 +92,11 @@ def step():
             if not conn.execute("SELECT 1 FROM refresh_run_shops WHERE run_id=? AND status='working'", (run["run_id"],)).fetchone():
                 conn.execute("UPDATE refresh_runs SET status='completed', finished_at=? WHERE run_id=?", (now(),run["run_id"]))
             return snapshot_after(conn,run["run_id"])
+        # Mark the selected shop as claimed before releasing the database transaction.
         conn.execute("UPDATE refresh_run_shops SET status='working', claimed_at=datetime('now') WHERE run_id=? AND position=?", (run["run_id"],pending["position"]))
         shop = conn.execute("SELECT * FROM monitored_shops WHERE shop_id=?", (pending["shop_id"],)).fetchone()
         before = conn.execute("SELECT COUNT(*) FROM listings WHERE shop_id=?", (pending["shop_id"],)).fetchone()[0]
+    # Perform the potentially slow Etsy work outside the database write transaction.
     error = None
     try:
         message = refresh_shop(shop) if shop['is_active'] else 'Skipped paused shop'
@@ -96,7 +106,9 @@ def step():
     with connect_database() as conn:
         conn.execute("BEGIN IMMEDIATE")
         after = conn.execute("SELECT COUNT(*) FROM listings WHERE shop_id=?", (pending["shop_id"],)).fetchone()[0]
+        # Count newly saved listings even when a refresh only partially succeeds.
         count = max(0,after-before)
+        # On an API rate limit, preserve partial progress, put the shop back in the queue and pause the run.
         if error and ("rate limit" in error.lower() or "429" in error):
             conn.execute("UPDATE refresh_run_shops SET status='pending',claimed_at=NULL,message=?,new_listings=new_listings+? WHERE run_id=? AND position=?",(error,count,run["run_id"],pending["position"]))
             conn.execute("UPDATE refresh_runs SET status='paused',error=?,new_listings=new_listings+? WHERE run_id=?",(error,count,run["run_id"]))
@@ -107,6 +119,7 @@ def step():
             baselines=baselines+?, failures=failures+?,last_shop=? WHERE run_id=?""",
             (count,int(not error and shop["is_active"] and not shop["last_checked"]),int(bool(error)),
              shop["shop_name"],run["run_id"]))
+        # Finish the run only when no shops are pending or working.
         remaining = conn.execute("SELECT 1 FROM refresh_run_shops WHERE run_id=? AND status IN ('pending','working') LIMIT 1", (run["run_id"],)).fetchone()
         if not remaining:
             conn.execute("UPDATE refresh_runs SET status='completed',finished_at=? WHERE run_id=?", (now(),run["run_id"]))
