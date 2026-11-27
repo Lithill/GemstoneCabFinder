@@ -5,10 +5,12 @@ from datetime import datetime, timezone, timedelta
 from favourite_feed.database import ensure_shop_baseline, connect_database, setup_database
 from favourite_feed.etsy_api import etsy_get
 
+# Request up to 100 listings per API page. Scan an extra day to catch delayed results.
 PAGE_SIZE = 100
 OVERLAP = timedelta(hours=24)
 ACTIVATION_WINDOW_SECONDS = 120
 
+# Compare Etsy timestamps to distinguish new listings from possible renewals; this is not a guarantee.
 def inclusion_reason(item, baseline, cutoff, upper):
     """Conservative signal for newly activated drafts; not proof of publication."""
     original = int(item.get("original_creation_timestamp") or 0)
@@ -18,11 +20,13 @@ def inclusion_reason(item, baseline, cutoff, upper):
         return "outside scan window"
     if baseline <= original <= upper:
         return "original creation after baseline"
+    # An older draft may be newly published if its activation and creation timestamps are close.
     if baseline <= state <= upper and abs(state - created) <= ACTIVATION_WINDOW_SECONDS:
         return "possible draft publication: activation matches creation"
     return "older original creation; no matching activation (possible renewal)"
 
 
+# Fetch photos and save the listing and its images together; existing listing IDs are not overwritten.
 def store_listing(shop_id, item, published_at, started):
     listing_id = item["listing_id"]
     images = etsy_get(f"listings/{listing_id}/images")["results"]
@@ -38,6 +42,7 @@ def store_listing(shop_id, item, published_at, started):
               html.unescape(item.get("description") or ""), item.get("url"),
               price.get("amount"), price.get("divisor"), price.get("currency_code"),
               published_at, started.isoformat()))
+        # Only save photos when a new listing was actually inserted.
         if result.rowcount:
             for image in images:
                 url = image.get("url_fullxfull") or image.get("url_570xN")
@@ -49,21 +54,25 @@ def store_listing(shop_id, item, published_at, started):
     return 0
 
 
+# Refresh one monitored seller, using its previous check and original monitoring baseline.
 def refresh_shop(shop):
     shop_id = shop["shop_id"]
     started = datetime.now(timezone.utc)
     with connect_database() as conn:
         conn.execute("BEGIN IMMEDIATE")
         ensure_shop_baseline(conn)
+    # For a seller never checked before, establish a starting date without importing old stock.
     if not shop["last_checked"]:
         with connect_database() as conn:
             conn.execute("UPDATE monitored_shops SET last_checked=?, baseline_at=? WHERE shop_id=?",
                          (started.isoformat(), started.isoformat(), shop_id))
         return "Baseline established (no backlog)"
+    # Convert dates to Unix timestamps (seconds since 1970) for comparison with Etsy's data.
     cutoff = int((datetime.fromisoformat(shop["last_checked"]) - OVERLAP).timestamp())
     upper = int(started.timestamp())
     offset = 0
     candidates = {}
+    # Fetch newest listings first, stopping when the search reaches older stock or the final page.
     while True:
         data = etsy_get(f"shops/{shop_id}/listings/active", {
             "limit": PAGE_SIZE, "offset": offset,
@@ -89,6 +98,7 @@ def refresh_shop(shop):
                                 (shop_id,)).fetchone()[0]
     baseline_ts = int(datetime.fromisoformat(baseline).timestamp())
     new_count = 0
+    # Skip known listings and candidates that fail the timestamp rules.
     for listing_id, item in candidates.items():
         reason = inclusion_reason(item, baseline_ts, cutoff, upper)
         if listing_id in known or reason.startswith(("outside", "older")):
@@ -96,11 +106,13 @@ def refresh_shop(shop):
         published_at = item["state_timestamp"] if int(item.get("original_creation_timestamp") or 0) < baseline_ts else item["original_creation_timestamp"]
         new_count += store_listing(shop_id, item, published_at, started)
     with connect_database() as conn:
+        # Advance the last checked date only after the scan and saves finish successfully.
         conn.execute("UPDATE monitored_shops SET last_checked=? WHERE shop_id=?",
                      (started.isoformat(), shop_id))
     return f"{new_count} new listings"
 
 
+# Command-line alternative to the website refresh; optionally select specific sellers or limit their number.
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int)
