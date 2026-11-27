@@ -2,12 +2,14 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Swipe — Gemstone feed</title><link rel="stylesheet" href="{{ url_for('static',filename='feed.css') }}"></head>
 <body><header><h1>Gemstone feed</h1><nav><a href="/dashboard">Dashboard</a><a href="/">Grid</a><a href="/refresh">Refresh</a><a href="/settings">Settings</a><a href="/?mode=liked">Favourites</a><form method="post" action="{{ url_for('undo') }}"><input type="hidden" name="view" value="swipe"><button>Undo</button></form></nav></header>
 <main class="swipe-main"><p><a href="/refresh">Refresh:</a> {{ refresh_status.status }} · {{ refresh_status.done }}/{{ refresh_status.total }} shops</p><h2>{{ count }} unseen</h2>
-{% if item %}<article id="swipe-card"><a draggable="false" id="photo-link" href="{{ url_for('detail',listing_id=item.listing_id) }}?view=swipe">{% if item.photo %}<img draggable="false" src="{{ item.photo }}" alt="{{ item.title }}">{% else %}<div class="placeholder">No photo</div>{% endif %}</a><div class="info"><strong>{{ item.title }}</strong><p>{{ item.shop_name }}</p>{% set main_price, original_price = price_display(item) %}{% if main_price %}<b>{{ main_price }}</b>{% if original_price %}<small style="display:block;color:#666">{{ original_price }}</small>{% endif %}{% endif %}</div></article>
+{# Display one unseen listing and submit its identifier through the server action URL. #}{% if item %}<article id="swipe-card"><a draggable="false" id="photo-link" href="{{ url_for('detail',listing_id=item.listing_id) }}?view=swipe">{% if item.photo %}<img draggable="false" src="{{ item.photo }}" alt="{{ item.title }}">{% else %}<div class="placeholder">No photo</div>{% endif %}</a><div class="info"><strong>{{ item.title }}</strong><p>{{ item.shop_name }}</p>{% set main_price, original_price = price_display(item) %}{% if main_price %}<b>{{ main_price }}</b>{% if original_price %}<small style="display:block;color:#666">{{ original_price }}</small>{% endif %}{% endif %}</div></article>
 <form class="actions swipe-actions" id="swipe-form" method="post" action="{{ url_for('action',listing_id=item.listing_id) }}"><input type="hidden" name="view" value="swipe"><button name="operation" value="seen">← Pass</button><button name="operation" value="like">♡ Like →</button></form><p class="swipe-hint">Swipe left to pass · right to like · tap photo to inspect</p>
 <script>
 const card = document.getElementById('swipe-card');
 const form = document.getElementById('swipe-form');
+// Track the current gesture, whether a click should be suppressed and whether a save is underway.
 let start = null, suppress = false, busy = false;
+// Allow vertical scrolling while JavaScript handles horizontal card gestures.
 card.style.touchAction = 'pan-y';
 card.style.userSelect = 'none';
 card.style.cursor = 'grab';
@@ -18,6 +20,7 @@ card.addEventListener('pointerdown', e => {
   card.style.transition = 'none';
   start = {x:e.clientX,y:e.clientY,id:e.pointerId};
 });
+// Move and rotate the card only when horizontal movement dominates.
 window.addEventListener('pointermove', e => {
   if (!start || e.pointerId !== start.id || busy) return;
   const x=e.clientX-start.x, y=e.clientY-start.y;
@@ -26,12 +29,14 @@ window.addEventListener('pointermove', e => {
     card.style.transform='translate3d('+x+'px,0,0) rotate('+Math.max(-18,Math.min(18,x/22))+'deg)';
   }
 });
+// Return an incomplete swipe to its original position.
 function reset(){
   start=null;
   card.style.transition='transform 180ms ease-out';
   card.style.transform='';
 }
 window.addEventListener('pointercancel', reset);
+// Require sufficient horizontal movement before committing a like or pass.
 window.addEventListener('pointerup', e=>{
   if(!start || e.pointerId!==start.id || busy)return;
   const x=e.clientX-start.x,y=e.clientY-start.y;
@@ -41,6 +46,7 @@ window.addEventListener('pointerup', e=>{
     flyAway(x>0?'like':'seen');
   } else reset();
 });
+// Animate the card away and guard against duplicate submissions.
 function flyAway(operation){
   if(busy)return;
   busy=true;
@@ -53,6 +59,7 @@ function flyAway(operation){
   card.style.transform='translate3d('+direction*(window.innerWidth+card.offsetWidth)+'px,0,0) rotate('+direction*22+'deg)';
   card.style.opacity='0';
   let submitted=false;
+  // Send the action once and check the returned saved state before moving to the next listing.
   async function submit(){
     if(submitted)return;
     submitted=true;
@@ -62,12 +69,14 @@ function flyAway(operation){
       const saved=await response.json();
       if(!saved.seen || (operation==='like' && !saved.liked))throw new Error('Saved state did not match swipe');
       window.location.replace('/?view=swipe');
+    // Restore the card and warn the user if the server's saved state cannot be confirmed.
     } catch(error){
       busy=false; suppress=false; field.remove();
       card.style.opacity='1'; reset();
       alert('Could not confirm '+operation+': '+error.message+'. Refresh the feed before retrying.');
     }
   }
+  // Submit after animation, with a timer fallback if the transition event does not fire.
   card.addEventListener('transitionend',submit,{once:true});
   setTimeout(submit,320);
 }
@@ -75,6 +84,7 @@ form.addEventListener('submit',e=>{
   e.preventDefault();
   if(e.submitter)flyAway(e.submitter.value);
 });
+// Prevent a swipe gesture from also opening the listing photo.
 card.addEventListener('click', e=>{if(suppress || busy){e.preventDefault();e.stopPropagation();}},true);
 window.addEventListener('pageshow', e=>{if(e.persisted)location.reload();});
 </script>{% else %}<p>You're all caught up!</p>{% endif %}</main><script src="{{ url_for('static',filename='refresh_worker.js') }}"></script></body></html>
