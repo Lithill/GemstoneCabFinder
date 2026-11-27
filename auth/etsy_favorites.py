@@ -3,6 +3,7 @@ import requests
 from dotenv import load_dotenv
 import json
 
+# Read the saved OAuth token from local storage.
 with open("etsy_tokens.json", "r") as file:
     token_data = json.load(file)
 
@@ -19,8 +20,10 @@ load_dotenv()
 api_key = os.getenv("ETSY_API_KEY")
 shared_secret = os.getenv("ETSY_SHARED_SECRET")
 
+# This diagnostic currently calls the ping endpoint, not a favourite-shop listing endpoint.
 url = "https://openapi.etsy.com/v3/application/openapi-ping"
 
+# Send the API credentials and bearer token with a bounded request timeout.
 response = requests.get(
     url,
     headers={
@@ -33,6 +36,7 @@ response = requests.get(
 
 print("HTTP status:", response.status_code)
 
+# Print response counts if present; a successful ping does not establish that favourites were retrieved.
 if response.status_code == 200:
     data = response.json()
     print("Favourite shops returned:", len(data.get("results", [])))
