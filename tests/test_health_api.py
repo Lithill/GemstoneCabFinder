@@ -12,6 +12,7 @@ from favourite_feed.health_vault import password_hash
 
 
 class PrivateStagingWorkflowTests(unittest.TestCase):
+    # Configure a temporary fictional vault and legacy login test client with cleanup registered.
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -33,6 +34,7 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         app.config.update(TESTING=True, SERVER_NAME="localhost")
         self.client = app.test_client()
 
+    # Simulate login and obtain the API anti-forgery token.
     def login(self):
         self.client.get("/health-auth/login")
         csrf = self.client.get_cookie("__Host-health_login_csrf").value
@@ -43,6 +45,7 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         self.assertEqual(session.status_code, 200)
         return session.json["csrf"]
 
+    # Exercise the full authenticated diary lifecycle, including omitted notes and access revocation.
     def test_login_save_load_edit_delete_logout(self):
         day = "2026-11-21"
         endpoint = "/private-health-api/checkin/" + day
@@ -79,6 +82,7 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         self.assertEqual(self.client.get(endpoint).status_code, 401)
         self.assertEqual(self.client.post(endpoint, json={"entries":[]}, headers=headers).status_code, 401)
 
+    # Check monthly timeline privacy, explicit rest and no bleeding, missing days and dated lifestyle changes.
     def test_month_timeline_private_and_distinguishes_missing(self):
         endpoint = "/private-health-api/month/2026-02"
         self.assertEqual(self.client.get(endpoint).status_code, 401)
@@ -101,6 +105,7 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         self.assertEqual(data["timeline"]["2026-02-04"]["changes"][0]["status"], "Stopped")
         self.assertNotIn("2026-02-02", data["days"])
 
+    # Require authentication, no-store caching policy and a supported report duration.
     def test_report_requires_auth_and_is_not_cached(self):
         endpoint = "/private-health-api/report/30"
         self.assertEqual(self.client.get(endpoint).status_code, 401)
@@ -112,6 +117,7 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         self.assertIn(b"No severity ratings recorded", response.data)
         self.assertEqual(self.client.get("/private-health-api/report/365").status_code, 400)
 
+    # An invalid answer in a batch must leave the diary empty.
     def test_invalid_submission_does_not_partially_save(self):
         csrf = self.login()
         response = self.client.post("/private-health-api/checkin/2026-11-21", headers={"X-Health-CSRF":csrf},
@@ -122,6 +128,7 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(self.client.get("/private-health-api/checkin/2026-11-21").json["entries"], [])
 
+    # Disable storage and verify existing sessions cannot use the API until re-enabled.
     def test_disabling_storage_switch_revokes_existing_api_access(self):
         csrf = self.login()
         endpoint = "/private-health-api/checkin/2026-11-21"
@@ -131,6 +138,7 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
                                               headers={"X-Health-CSRF":csrf}).status_code, 404)
         self.assertEqual(self.client.get(endpoint).status_code, 200)
 
+    # Reject the reserved database filenames used in these test cases.
     def test_staging_path_cannot_target_production_vault(self):
         csrf = self.login()
         endpoint = "/private-health-api/checkin/2026-11-21"
@@ -140,6 +148,7 @@ class PrivateStagingWorkflowTests(unittest.TestCase):
                     self.assertEqual(self.client.post(endpoint, json={"entries":[]},
                                                       headers={"X-Health-CSRF":csrf}).status_code, 503)
 
+    # With storage explicitly disabled, hide save controls and return 404 for the session endpoint.
     def test_storage_disabled_by_default_in_preview(self):
         with patch.dict(os.environ, {"HEALTH_STAGING_STORAGE_ENABLED": "0"}):
             app = create_staging_app()
