@@ -137,14 +137,16 @@ def water(plant_id):
         parsed = date.fromisoformat(day)
     except ValueError:
         abort(400)
-    if parsed > date.today() or parsed.year < 2000:
+    if parsed > date.today() or parsed.year < 2000 or parsed.isoformat() != day:
         abort(400)
     with closing(connection()) as conn:
         with conn:
             if not conn.execute("SELECT 1 FROM houseplants WHERE id=?", (plant_id,)).fetchone():
                 abort(404)
-            conn.execute("INSERT INTO plant_watering(plant_id,watered_on,recorded_at) VALUES (?,?,?)",
-                         (plant_id, day, datetime.now(timezone.utc).isoformat()))
+            conn.execute("""INSERT INTO plant_watering(plant_id,watered_on,recorded_at)
+                SELECT ?,?,? WHERE NOT EXISTS (
+                    SELECT 1 FROM plant_watering WHERE plant_id=? AND watered_on=?)""",
+                (plant_id, day, datetime.now(timezone.utc).isoformat(), plant_id, day))
     return redirect(url_for("plants.index"), code=303)
 
 
