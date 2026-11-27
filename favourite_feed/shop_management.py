@@ -63,3 +63,24 @@ def import_recent(sid, limit):
         published = int(item.get("original_creation_timestamp") or item.get("creation_timestamp") or 0)
         count += store_listing(sid,item,published,now)
     return count
+
+
+# Walk every active listing page, skipping saved IDs so retries preserve review status.
+def import_all(sid):
+    with connect_database() as conn:
+        if not conn.execute("SELECT 1 FROM monitored_shops WHERE shop_id=?", (sid,)).fetchone():
+            raise ValueError("Unknown shop.")
+        known = {r[0] for r in conn.execute("SELECT listing_id FROM listings WHERE shop_id=?", (sid,))}
+    now = datetime.now(timezone.utc)
+    count = offset = 0
+    while True:
+        rows = etsy_get(f"shops/{sid}/listings/active", {"limit":100,"offset":offset,"sort_on":"created","sort_order":"desc"})["results"]
+        for item in rows:
+            if item["listing_id"] in known:
+                continue
+            published = int(item.get("original_creation_timestamp") or item.get("creation_timestamp") or 0)
+            count += store_listing(sid,item,published,now)
+            known.add(item["listing_id"])
+        if len(rows) < 100:
+            return count
+        offset += len(rows)
