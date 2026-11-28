@@ -96,9 +96,13 @@ def register_seller_routes(app, refresh_lock):
                 if operation == "add":
                     sid, created = add_shop(request.form.get("shop",""))
                     message = "Shop added. Future listings will be monitored." if created else "Shop already exists; its monitoring status is unchanged."
-                elif operation in ("pause","resume","import","import_all"):
+                elif operation in ("pause","resume","import","import_all","etsy_confirm","etsy_unconfirm"):
                     sid = int(request.form.get("shop_id",""))
-                    if operation == "import_all":
+                    if operation in ("etsy_confirm","etsy_unconfirm"):
+                        from favourite_feed.etsy_favourite_status import set_confirmed
+                        set_confirmed(sid, operation=="etsy_confirm")
+                        return redirect(url_for("favourite_shops")+"#shop-"+str(sid))
+                    elif operation == "import_all":
                         from favourite_feed import shop_import_jobs
                         shop_import_jobs.start(sid)
                         return redirect(url_for("shop_import", sid=sid))
@@ -123,8 +127,10 @@ def register_seller_routes(app, refresh_lock):
                 refresh_lock.release()
         with connect_database() as conn:
             # Count saved listings for each seller and show active sellers before paused ones.
-            shops = conn.execute("""SELECT s.*, (SELECT COUNT(*) FROM listings l WHERE l.shop_id=s.shop_id) AS listing_count
-                FROM monitored_shops s ORDER BY is_active DESC, shop_name COLLATE NOCASE""").fetchall()
+            from favourite_feed.etsy_favourite_status import setup
+            setup(conn)
+            shops = conn.execute("""SELECT s.*, EXISTS(SELECT 1 FROM etsy_favourite_confirmations e WHERE e.shop_id=s.shop_id) AS etsy_confirmed, (SELECT COUNT(*) FROM listings l WHERE l.shop_id=s.shop_id) AS listing_count
+                FROM monitored_shops s ORDER BY etsy_confirmed, is_active DESC, shop_name COLLATE NOCASE""").fetchall()
         return render_template("favourite_shops.html", shops=shops, message=message)
 
 
