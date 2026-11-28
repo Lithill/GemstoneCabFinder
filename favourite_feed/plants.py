@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import sqlite3
 from contextlib import closing
+from collections import defaultdict
+from statistics import mean
 from urllib.parse import urlsplit
 
 from flask import Blueprint, abort, redirect, render_template, request, url_for
@@ -50,6 +52,10 @@ def connection():
     conn.execute("""CREATE TABLE IF NOT EXISTS plant_watering (
         id INTEGER PRIMARY KEY, plant_id INTEGER NOT NULL REFERENCES houseplants(id) ON DELETE CASCADE,
         watered_on TEXT NOT NULL, recorded_at TEXT NOT NULL)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS plant_moisture (
+        plant_id INTEGER NOT NULL REFERENCES houseplants(id) ON DELETE CASCADE,
+        checked_on TEXT NOT NULL, moisture TEXT NOT NULL, recorded_at TEXT NOT NULL,
+        PRIMARY KEY (plant_id, checked_on))""")
     # Enable foreign-key enforcement so deleting a plant also removes its watering history.
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("CREATE TABLE IF NOT EXISTS plant_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
@@ -85,6 +91,13 @@ def index():
     with closing(connection()) as conn:
         entries = conn.execute("""SELECT p.*, (SELECT MAX(watered_on) FROM plant_watering w WHERE w.plant_id=p.id) AS last_watered
                                   FROM houseplants p ORDER BY p.name COLLATE NOCASE, p.id""").fetchall()
+        # Load all histories in two queries, rather than querying each plant separately.
+        watering = defaultdict(list)
+        moisture = defaultdict(list)
+        for row in conn.execute("SELECT plant_id, watered_on FROM plant_watering ORDER BY watered_on DESC"):
+            watering[row["plant_id"]].append(row["watered_on"])
+        for row in conn.execute("SELECT * FROM plant_moisture ORDER BY checked_on DESC"):
+            moisture[row["plant_id"]].append(row)
     today = date.today()
     # Use April through September as spring/summer and the remaining months as autumn/winter.
     season = "spring/summer" if 4 <= today.month <= 9 else "autumn/winter"
@@ -111,7 +124,13 @@ def index():
                 guidance = "Check the water tray daily or every other day; keep its compost wet"
         else:
             guidance = "Check soil moisture regularly; no species-specific interval yet"
-        guides[plant["id"]] = {"days_since": days_since, "guidance": guidance}
+        dates = sorted(set(watering[plant["id"]]))
+        intervals = [(date.fromisoformat(b)-date.fromisoformat(a)).days for a,b in zip(dates,dates[1:])]
+        guides[plant["id"]] = {"days_since": days_since, "guidance": guidance,
+            "watering": list(reversed(dates)), "moisture": moisture[plant["id"]],
+            "average": round(mean(intervals),1) if intervals else None,
+            "shortest": min(intervals) if intervals else None,
+            "longest": max(intervals) if intervals else None}
     # Pass plant records, care advice and calculated guidance to the page template.
     return render_template("plants.html", entries=entries, care=CARE, species=list(CARE),
                            today=today.isoformat(), season=season, temperature=temperature, guides=guides)
@@ -178,3 +197,28 @@ def delete(plant_id):
         with conn:
             conn.execute("DELETE FROM houseplants WHERE id=?", (plant_id,))
     return redirect(url_for("plants.index"), code=303)
+
+
+@plants.post("/plants/<int:plant_id>/moisture")
+@protected
+def record_moisture(plant_id):
+    # Record an observation, not an instruction to water. One editable observation per day.
+    day = request.form.get("checked_on", "")
+    moisture = request.form.get("moisture", "")
+    try:
+        parsed = date.fromisoformat(day)
+    except ValueError:
+        abort(400)
+    if parsed > date.today() or parsed.year < 2000 or parsed.isoformat() != day:
+        abort(400)
+    if moisture not in ("Wet", "Moist", "Almost dry", "Dry"):
+        abort(400)
+    with closing(connection()) as conn:
+        with conn:
+            if not conn.execute("SELECT 1 FROM houseplants WHERE id=?", (plant_id,)).fetchone():
+                abort(404)
+            conn.execute("""INSERT INTO plant_moisture(plant_id,checked_on,moisture,recorded_at)
+                VALUES (?,?,?,?) ON CONFLICT(plant_id,checked_on) DO UPDATE SET
+                moisture=excluded.moisture, recorded_at=excluded.recorded_at""",
+                (plant_id,day,moisture,datetime.now(timezone.utc).isoformat()))
+    return redirect(url_for("plants.index")+"#plant-"+str(plant_id), code=303)
