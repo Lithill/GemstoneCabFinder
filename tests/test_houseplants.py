@@ -39,6 +39,26 @@ class HouseplantTests(unittest.TestCase):
                 with closing(module.connection()) as conn:
                     self.assertEqual(conn.execute("SELECT COUNT(*) FROM houseplants").fetchone()[0], 16)
 
+    def test_moisture_and_history(self):
+        with TemporaryDirectory() as temp, patch.object(module, "DB_PATH", Path(temp)/"plants.db"):
+            client = app.test_client()
+            client.get("/plants")
+            headers = {"Origin": "https://localhost"}
+            for day in ("2020-01-01", "2020-01-11"):
+                self.assertEqual(client.post("/plants/1/water", data={"watered_on":day}, headers=headers, base_url="https://localhost").status_code,303)
+            for state in ("Wet","Moist"):
+                response = client.post("/plants/1/moisture", data={"checked_on":"2020-01-12","moisture":state}, headers=headers, base_url="https://localhost")
+                self.assertEqual(response.status_code,303)
+            with closing(module.connection()) as conn:
+                self.assertEqual(conn.execute("SELECT moisture FROM plant_moisture").fetchone()[0],"Moist")
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM plant_moisture").fetchone()[0],1)
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM plant_watering").fetchone()[0],2)
+            page = client.get("/plants")
+            self.assertIn(b"Average interval: 10",page.data)
+            self.assertIn(b"2020-01-12",page.data)
+            self.assertEqual(client.post("/plants/1/moisture",data={"checked_on":"2020-01-12","moisture":"invalid"},headers=headers,base_url="https://localhost").status_code,400)
+            self.assertEqual(client.post("/plants/1/moisture",data={"checked_on":"2020-01-12","moisture":"Wet"},headers={"Origin":"https://other.example"},base_url="https://localhost").status_code,403)
+
     # A form submission from another origin must be rejected with HTTP 403.
     def test_cross_origin_write_blocked(self):
         client = app.test_client()
