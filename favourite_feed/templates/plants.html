@@ -63,6 +63,20 @@
 {# Show species-specific moisture advice first, with other care advice in expandable sections. #}<details open><summary>How to tell when it needs water</summary><p>{{ care[plant.species][0] }}</p></details>
 <details><summary>Problem signs to look for</summary><p>{{ care[plant.species][1] }}</p></details>
 <details><summary>How to keep it healthier</summary><p>{{ care[plant.species][2] }}</p></details>
+<details open><summary>Record a moisture check</summary>
+<p>Check the compost at the depth recommended above. A check does not mean you need to water. For moisture-loving plants such as Cape sundew, do not wait for dry compost.</p>
+<form method="post" action="{{ url_for('plants.record_moisture',plant_id=plant.id) }}">
+<label for="check-date-{{ plant.id }}">Date</label><input id="check-date-{{ plant.id }}" type="date" name="checked_on" value="{{ today }}" max="{{ today }}" required>
+<label for="moisture-{{ plant.id }}">Moisture</label><select id="moisture-{{ plant.id }}" name="moisture" required><option value="">Choose observation</option>{% for state in ['Wet','Moist','Almost dry','Dry'] %}<option>{{ state }}</option>{% endfor %}</select>
+<button type="submit">Save moisture check</button></form>
+<p class="note">Saving another check for the same date updates that day's observation.</p>
+{% if guides[plant.id].moisture %}<p>Latest check: {{ guides[plant.id].moisture[0].checked_on }} — {{ guides[plant.id].moisture[0].moisture }}</p>{% endif %}
+</details>
+<details><summary>Moisture check history ({{ guides[plant.id].moisture|length }})</summary>
+<ul>{% for check in guides[plant.id].moisture %}<li>{{ check.checked_on }} — {{ check.moisture }}</li>{% else %}<li>No checks recorded yet.</li>{% endfor %}</ul></details>
+<details><summary>Watering history ({{ guides[plant.id].watering|length }})</summary>
+{% if guides[plant.id].average is not none %}<p>Average interval: {{ guides[plant.id].average }} days. Shortest: {{ guides[plant.id].shortest }} days. Longest: {{ guides[plant.id].longest }} days.</p><p class="note">Past intervals describe your records, not recommended watering frequency.</p>{% else %}<p>At least two watering dates are needed to calculate intervals.</p>{% endif %}
+<ul>{% for day in guides[plant.id].watering %}<li>{{ day }}</li>{% else %}<li>No watering dates recorded yet.</li>{% endfor %}</ul></details>
 {# Submit today's date to the watering endpoint for this plant; the return link only changes the view. #}<form method="post" action="{{ url_for('plants.water',plant_id=plant.id) }}">
 <input type="hidden" name="watered_on" value="{{ today }}">
 <a class="return-plants" href="#plant-overview">Return to plants</a>
