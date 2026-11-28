@@ -15,6 +15,12 @@ if(search)search.addEventListener('input',()=>{
 for(const button of document.querySelectorAll('.seller-reject')){
  button.addEventListener('click',event=>{if(!window.confirm('Reject this shop? It will no longer appear in your review list.'))event.preventDefault();});
 }
+// Open Etsy directly from the user gesture; the normal form still saves the dashboard favourite.
+for(const form of document.querySelectorAll("form[data-etsy-url]")){
+ form.addEventListener("submit",event=>{
+  if(["favourite","favourite_import_all"].includes(event.submitter?.value))window.open(form.dataset.etsyUrl,"_blank","noopener,noreferrer");
+ });
+}
 // Keep local filtering available even when there is no active discovery run.
 if(!go)return;
 let running=false,busy=false;
